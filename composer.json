@@ -1,0 +1,55 @@
+{
+    "name": "pelican-dev/pelican-pangolin",
+    "description": "Pangolin publication integration for Pelican Panel",
+    "type": "library",
+    "license": "AGPL-3.0-only",
+    "require": {
+        "php": "^8.3 || ^8.4 || ^8.5"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.9",
+        "laravel/pint": "^1.29",
+        "mockery/mockery": "^1.6.12",
+        "orchestra/testbench": "^11.0",
+        "pelican-dev/panel": "dev-main",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-livewire": "^4.0"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "pelican-panel",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "PelicanDev\\PelicanPangolin\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PelicanDev\\PelicanPangolin\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "analyse": "phpstan analyse --memory-limit=-1",
+        "lint": "pint --test src tests database config scripts",
+        "test": "pest"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "optimize-autoloader": true,
+        "platform": {
+            "php": "8.3.0"
+        },
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

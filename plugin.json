@@ -1,0 +1,15 @@
+{
+    "id": "pelican-pangolin",
+    "name": "Pelican Pangolin",
+    "author": "Pelican Pangolin contributors",
+    "version": "1.0.0",
+    "description": "Publishes opted-in Pelican servers through Pangolin.",
+    "category": "plugin",
+    "namespace": "PelicanDev\\PelicanPangolin",
+    "class": "PelicanPangolinPlugin",
+    "panels": [
+        "admin"
+    ],
+    "panel_version": "^1.0.0",
+    "composer_packages": null
+}
