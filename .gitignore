@@ -1,0 +1,7 @@
+/build/
+/vendor/
+/pelican-panel
+/.phpunit.cache/
+/.phpstan.cache/
+/.env
+composer.phar
