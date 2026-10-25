@@ -19,7 +19,7 @@ final class PangolinInfrastructureCommand extends Command
         );
 
         $this->warn($snippets['warning']);
-        foreach (['firewall', 'compose', 'traefik'] as $section) {
+        foreach (['firewall', 'compose', 'traefik', 'pangolin'] as $section) {
             $this->newLine();
             $this->info(ucfirst($section));
             $this->line($snippets[$section]);

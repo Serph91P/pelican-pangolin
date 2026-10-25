@@ -15,6 +15,8 @@ use PelicanDev\PelicanPangolin\Enums\PublicationMode;
  * @property int|null $pangolin_target_id
  * @property int|null $public_port
  * @property string|null $confirmed_domain
+ * @property string|null $ownership_name
+ * @property string|null $confirmed_endpoint
  * @property bool $enabled
  * @property-read ServerPublication $publication
  */

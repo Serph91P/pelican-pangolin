@@ -4,23 +4,25 @@
     "type": "library",
     "license": "AGPL-3.0-only",
     "require": {
-        "php": "^8.3 || ^8.4 || ^8.5"
+        "php": "^8.4 || ^8.5"
     },
     "require-dev": {
         "larastan/larastan": "^3.9",
         "laravel/pint": "^1.29",
         "mockery/mockery": "^1.6.12",
         "orchestra/testbench": "^11.0",
-        "pelican-dev/panel": "dev-main",
+        "pelican/panel": "1.0.0-rc.2",
         "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-livewire": "^4.0"
+        "pestphp/pest-plugin-livewire": "^4.0",
+        "symfony/http-foundation": "^7.4.19"
     },
     "repositories": [
         {
             "type": "path",
             "url": "pelican-panel",
             "options": {
-                "symlink": true
+                "symlink": true,
+                "versions": {"pelican/panel": "1.0.0-rc.2"}
             }
         }
     ],
@@ -45,7 +47,7 @@
         },
         "optimize-autoloader": true,
         "platform": {
-            "php": "8.3.0"
+            "php": "8.4.0"
         },
         "preferred-install": "dist",
         "sort-packages": true

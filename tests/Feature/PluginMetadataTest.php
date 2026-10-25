@@ -16,7 +16,8 @@ it('declares installable administrator-only Pelican metadata', function () {
         'namespace' => 'PelicanDev\\PelicanPangolin',
         'class' => 'PelicanPangolinPlugin',
         'panels' => ['admin'],
-        'panel_version' => '^1.0.0',
-        'composer_packages' => null,
+        'panel_version' => '1.0.0-rc.2',
+        'api_version' => 1,
+        'composer_packages' => [],
     ]);
 });

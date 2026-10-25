@@ -6,6 +6,7 @@ enum PublicationMode: string
 {
     case Tcp = 'tcp';
     case Udp = 'udp';
+    case Both = 'both';
     case Http = 'http';
     case Https = 'https';
     case Ignored = 'ignored';

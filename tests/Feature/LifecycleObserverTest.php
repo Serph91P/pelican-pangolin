@@ -10,6 +10,7 @@ use PelicanDev\PelicanPangolin\Jobs\ReconcileServerPublication;
 use PelicanDev\PelicanPangolin\Jobs\RemoveServerPublication;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
 use PelicanDev\PelicanPangolin\Observers\ServerObserver;
+use PelicanDev\PelicanPangolin\Services\PublicationStateSnapshot;
 
 uses(RefreshDatabase::class);
 
@@ -31,6 +32,23 @@ it('tombstones exact ownership and queues after-commit removal before server del
         && $job->serverId === 12
         && $job->revision === 2
         && $job->afterCommit === true);
+});
+
+it('serializes snapshots from stale models and does not revive an opted-out publication', function () {
+    $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'opted_in' => true]);
+    $stale = $publication->fresh();
+    $server = new Server;
+    $server->setRawAttributes(['id' => 12, 'node_id' => 7, 'allocation_id' => 1]);
+    $egg = new Egg;
+    $egg->setRawAttributes(['uuid' => 'e2ed07f0-7f4f-4fa4-9c90-56b0c0998a70']);
+    $server->setRelation('egg', $egg)->setRelation('allocations', new Collection);
+    $snapshot = app(PublicationStateSnapshot::class);
+    $snapshot->refresh($server, $publication);
+    $snapshot->refresh($server, $stale);
+    expect($publication->fresh()->desired_revision)->toBe(3);
+    ServerPublication::whereKey($publication->id)->update(['opted_in' => false, 'desired_revision' => 4, 'status' => 'removing']);
+    $snapshot->refresh($server, $stale);
+    expect($publication->fresh()->desired_revision)->toBe(4)->and($publication->fresh()->status->value)->toBe('removing');
 });
 
 it('refreshes opted-in publications on every saved server and preserves suspension', function () {

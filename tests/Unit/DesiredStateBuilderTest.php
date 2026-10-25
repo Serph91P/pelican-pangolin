@@ -17,11 +17,11 @@ it('builds explicit overrides before Egg suggestions and ignores unknown allocat
             ['id' => 52, 'port' => 8080],
         ],
         profileRules: [
-            0 => ['mode' => 'tcp'],
-            1 => ['mode' => 'udp'],
+            0 => ['mode' => 'tcp', 'purpose' => 'game', 'allocation_port' => 25565],
+            1 => ['mode' => 'udp', 'purpose' => 'query', 'allocation_port' => 19132],
         ],
         overrides: [
-            50 => ['mode' => 'https', 'domain' => 'games.example.com', 'subdomain' => 'survival'],
+            50 => ['mode' => 'https', 'purpose' => 'game', 'domain' => 'games.example.com', 'subdomain' => 'survival'],
         ],
         defaultDomain: 'example.com',
     );
@@ -40,7 +40,7 @@ it('fails closed for stale revisions and incomplete HTTP configuration', functio
         server: ['uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'desired_revision' => $actual],
         mapping: ['site_id' => 7, 'target_host' => 'host.internal', 'enabled' => true],
         allocations: [['id' => 50, 'port' => 8080]],
-        profileRules: [0 => $rule],
+        profileRules: [0 => [...$rule, 'purpose' => 'game', 'allocation_port' => 8080]],
         overrides: [],
         defaultDomain: $domain,
     );

@@ -67,6 +67,8 @@ final class EggProfileResource extends Resource
             Toggle::make('enabled')->default(true),
             Repeater::make('rules')->relationship()->schema([
                 TextInput::make('allocation_position')->integer()->minValue(0)->required(),
+                TextInput::make('allocation_port')->label('Exact approved allocation port')->integer()->minValue(1024)->maxValue(65535)->required(),
+                Select::make('purpose')->options(['game' => 'Game', 'query' => 'Query', 'ignored' => 'Do not publish'])->required(),
                 Select::make('mode')->options(collect(PublicationMode::cases())->mapWithKeys(fn (PublicationMode $mode): array => [$mode->value => ucfirst($mode->value)]))->required()->live(),
                 TextInput::make('domain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),
                 TextInput::make('subdomain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),

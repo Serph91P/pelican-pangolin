@@ -7,7 +7,7 @@ use PelicanDev\PelicanPangolin\Data\DesiredPublication;
 use PelicanDev\PelicanPangolin\Data\DesiredResource;
 use PelicanDev\PelicanPangolin\Enums\PublicationMode;
 use PelicanDev\PelicanPangolin\Enums\SyncStatus;
-use PelicanDev\PelicanPangolin\Exceptions\PangolinApiException;
+use PelicanDev\PelicanPangolin\Models\ManagedResource;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
 use PelicanDev\PelicanPangolin\Services\PublicationReconciler;
 use PelicanDev\PelicanPangolin\Services\PublicPortAllocator;
@@ -38,7 +38,7 @@ it('recovers idempotently when target creation fails after resource creation', f
 
             return ['targetId' => 92];
         });
-        $mock->shouldReceive('getResource')->once()->with(91)->andReturn(['resourceId' => 91, 'enabled' => true]);
+        $mock->shouldReceive('getResource')->once()->with(91)->andReturnUsing(fn () => ['resourceId' => 91, 'name' => ManagedResource::where('pangolin_resource_id', 91)->firstOrFail()->ownership_name, 'enabled' => true]);
         $mock->shouldReceive('updateResource')->once()->with(91, Mockery::type('array'))->andReturn(['resourceId' => 91]);
         $mock->shouldReceive('updateTarget')->never();
     });
@@ -77,7 +77,9 @@ it('disables and removes only exact locally owned remote identifiers', function 
 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldReceive('updateResource')->once()->with(101, ['enabled' => false])->andReturn(['resourceId' => 101]);
+        $mock->shouldReceive('getResource')->twice()->with(101)->andReturn(['resourceId' => 101, 'name' => 'pelican-10b8c7c9ee30-60']);
         $mock->shouldReceive('deleteResource')->once()->with(101);
+        $mock->shouldReceive('listTargets')->once()->with(101)->andReturn([]);
     });
     $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('27015', '27015'), new ResourceNaming);
 
@@ -113,9 +115,8 @@ it('repairs a missing owned target without adopting an unowned target', function
 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldReceive('listResources')->once()->andReturn([]);
-        $mock->shouldReceive('getResource')->once()->with(201)->andReturn(['resourceId' => 201]);
-        $mock->shouldReceive('updateTarget')->once()->with(202, 7, '10.0.0.44', 25565, PublicationMode::Tcp)
-            ->andThrow(new PangolinApiException('Target not found.', 404));
+        $mock->shouldReceive('getResource')->once()->with(201)->andReturn(['resourceId' => 201, 'name' => 'pelican-7f84b78538a0-70']);
+        $mock->shouldReceive('updateTarget')->never();
         $mock->shouldReceive('listTargets')->once()->with(201)->andReturn([]);
         $mock->shouldReceive('createTarget')->once()->with(201, 7, '10.0.0.44', 25565, PublicationMode::Tcp)
             ->andReturn(['targetId' => 203]);
@@ -140,18 +141,19 @@ it('publishes HTTP only with an explicit verified domain and stores Pangolins co
     ]);
 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
-        $mock->shouldReceive('listDomains')->once()->andReturn([
+        $mock->shouldReceive('listDomains')->twice()->andReturn([
             ['domainId' => 'unverified-domain', 'baseDomain' => 'example.com'],
             ['domainId' => 'domain-1', 'baseDomain' => 'example.com', 'verified' => true],
         ]);
         $mock->shouldReceive('listResources')->once()->andReturn([]);
         $mock->shouldReceive('createHttpResource')->once()
-            ->with('pelican-1973b219960e-80', 'domain-1', 'play')
+            ->with(Mockery::pattern('/^pelican-1973b219960e-80-https-[a-f0-9]{24}$/'), 'domain-1', 'play')
             ->andReturn(['resourceId' => 301, 'fullDomain' => 'play.example.com']);
         $mock->shouldReceive('createTarget')->once()
             ->with(301, 7, 'web.internal', 8080, PublicationMode::Https)
             ->andReturn(['targetId' => 302]);
         $mock->shouldReceive('listTargets')->once()->with(301)->andReturn([]);
+        $mock->shouldReceive('updateResource')->once()->with(301, Mockery::type('array'))->andReturn(['resourceId' => 301, 'fullDomain' => 'play.example.com']);
     });
     $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
 
@@ -182,7 +184,8 @@ it('updates the domain of an existing HTTP resource', function () {
 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldReceive('listResources')->once()->andReturn([]);
-        $mock->shouldReceive('getResource')->once()->with(401)->andReturn(['resourceId' => 401]);
+        $mock->shouldReceive('getResource')->once()->with(401)->andReturn(['resourceId' => 401, 'name' => 'pelican-8a04496a386f-90']);
+        $mock->shouldReceive('listTargets')->once()->with(401)->andReturn([['targetId' => 402]]);
         $mock->shouldReceive('updateTarget')->once()->with(402, 7, 'web.internal', 8443, PublicationMode::Https)->andReturn(['targetId' => 402]);
         $mock->shouldReceive('listDomains')->once()->andReturn([
             ['domainId' => 'domain-2', 'baseDomain' => 'example.net', 'verified' => true],
@@ -222,7 +225,8 @@ it('reuses one ownership row when switching an allocation between HTTP methods',
         $mock->shouldReceive('listResources')->once()->andReturn([
             ['resourceId' => 701, 'name' => 'pelican-46db207049f8-120', 'mode' => 'http', 'fullDomain' => 'play.example.com'],
         ]);
-        $mock->shouldReceive('getResource')->once()->with(701)->andReturn(['resourceId' => 701]);
+        $mock->shouldReceive('getResource')->once()->with(701)->andReturn(['resourceId' => 701, 'name' => 'pelican-46db207049f8-120']);
+        $mock->shouldReceive('listTargets')->once()->with(701)->andReturn([['targetId' => 702]]);
         $mock->shouldReceive('updateTarget')->once()->with(702, 7, 'web.internal', 8080, PublicationMode::Http)->andReturn(['targetId' => 702]);
         $mock->shouldReceive('listDomains')->once()->andReturn([
             ['domainId' => 'domain-1', 'baseDomain' => 'example.com', 'verified' => true],
@@ -248,10 +252,11 @@ it('adopts one exact deterministic resource and target after an ambiguous create
     $desired = new DesiredPublication(1, 7, '10.0.0.50', [
         new DesiredResource(100, 25565, PublicationMode::Tcp, null),
     ]);
+    $publication->resources()->create(['allocation_id' => 100, 'mode' => 'tcp', 'public_port' => 25565, 'ownership_name' => 'pelican-ef02fb28c49a-100-tcp-0123456789abcdef01234567']);
 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldReceive('listResources')->once()->andReturn([
-            ['resourceId' => 501, 'name' => 'pelican-ef02fb28c49a-100', 'mode' => 'tcp', 'proxyPort' => 25565],
+            ['resourceId' => 501, 'name' => 'pelican-ef02fb28c49a-100-tcp-0123456789abcdef01234567', 'mode' => 'tcp', 'proxyPort' => 25565],
         ]);
         $mock->shouldReceive('createRawResource')->never();
         $mock->shouldReceive('listTargets')->once()->with(501)->andReturn([
@@ -259,7 +264,7 @@ it('adopts one exact deterministic resource and target after an ambiguous create
         ]);
         $mock->shouldReceive('createTarget')->never();
         $mock->shouldReceive('updateResource')->once()->with(501, [
-            'name' => 'pelican-ef02fb28c49a-100',
+            'name' => 'pelican-ef02fb28c49a-100-tcp-0123456789abcdef01234567',
             'enabled' => true,
             'proxyPort' => 25565,
         ])->andReturn(['resourceId' => 501]);
@@ -273,7 +278,7 @@ it('adopts one exact deterministic resource and target after an ambiguous create
         ->and($owned->pangolin_target_id)->toBe(502);
 });
 
-it('falls back to the next pool port when Pangolin already uses the allocation port', function () {
+it('fails clearly without remapping when Pangolin already uses the allocation port', function () {
     $publication = ServerPublication::query()->create([
         'server_id' => 18,
         'server_uuid' => 'ca1756f7-7a78-4960-965b-649f37ddf432',
@@ -287,15 +292,12 @@ it('falls back to the next pool port when Pangolin already uses the allocation p
         $mock->shouldReceive('listResources')->once()->andReturn([
             ['resourceId' => 601, 'name' => 'foreign-resource', 'mode' => 'tcp', 'proxyPort' => 25565],
         ]);
-        $mock->shouldReceive('createRawResource')->once()->with('pelican-ca1756f77a78-110', PublicationMode::Tcp, 25566)
-            ->andReturn(['resourceId' => 602]);
-        $mock->shouldReceive('listTargets')->once()->with(602)->andReturn([]);
-        $mock->shouldReceive('createTarget')->once()->with(602, 7, '10.0.0.51', 25565, PublicationMode::Tcp)
-            ->andReturn(['targetId' => 603]);
+        $mock->shouldReceive('createRawResource')->never();
+        $mock->shouldReceive('createTarget')->never();
     });
     $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565-25566', '25565'), new ResourceNaming);
 
-    $reconciler->reconcile($publication, $desired);
-
-    expect($publication->resources()->firstOrFail()->public_port)->toBe(25566);
+    expect(fn () => $reconciler->reconcile($publication, $desired))->toThrow(RuntimeException::class, 'exact allocation port');
+    expect($publication->resources()->count())->toBe(0)
+        ->and($publication->fresh()->status)->toBe(SyncStatus::Error);
 });

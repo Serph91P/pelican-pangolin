@@ -10,6 +10,7 @@ use Filament\Notifications\Notification;
 use Filament\Panel;
 use Illuminate\Support\Facades\Artisan;
 use PelicanDev\PelicanPangolin\Contracts\PangolinClient;
+use PelicanDev\PelicanPangolin\Filament\Admin\Pages\Infrastructure;
 use PelicanDev\PelicanPangolin\Services\HttpPangolinClient;
 use PelicanDev\PelicanPangolin\Services\PluginSettings;
 use PelicanDev\PelicanPangolin\Services\PublicationRefreshService;
@@ -26,6 +27,7 @@ final class PelicanPangolinPlugin implements HasPluginSettings, Plugin
 
     public function register(Panel $panel): void
     {
+        $panel->pages([Infrastructure::class]);
         $panel->discoverResources(
             plugin_path($this->getId(), 'src/Filament/Admin/Resources'),
             'PelicanDev\\PelicanPangolin\\Filament\\Admin\\Resources',
@@ -49,6 +51,7 @@ final class PelicanPangolinPlugin implements HasPluginSettings, Plugin
                 ->password()
                 ->helperText('Leave blank to retain the configured token.'),
             TextInput::make('default_domain')->label('Default HTTP domain'),
+            TextInput::make('public_host')->label('Public game host (IPv4, IPv6 or domain)')->required()->helperText('Explicit player-facing host; never the API URL. Raw ports must equal allocation ports.'),
             TextInput::make('tcp_ports')->label('TCP public port pool')->required(),
             TextInput::make('udp_ports')->label('UDP public port pool')->required(),
             TextInput::make('connect_timeout')->numeric()->minValue(1)->maxValue(60)->required(),
@@ -79,6 +82,7 @@ final class PelicanPangolinPlugin implements HasPluginSettings, Plugin
             'organization_id' => $environment['PANGOLIN_ORGANIZATION_ID'],
             'token' => $environment['PANGOLIN_API_TOKEN'],
             'default_domain' => $environment['PANGOLIN_DEFAULT_DOMAIN'],
+            'public_host' => $environment['PANGOLIN_PUBLIC_HOST'],
             'tcp_ports' => $environment['PANGOLIN_TCP_PORTS'],
             'udp_ports' => $environment['PANGOLIN_UDP_PORTS'],
             'connect_timeout' => $environment['PANGOLIN_CONNECT_TIMEOUT'],
