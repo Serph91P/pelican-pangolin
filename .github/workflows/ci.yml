@@ -35,3 +35,14 @@ jobs:
       - run: composer lint
       - run: composer analyse
       - run: scripts/build-plugin.sh
+
+  mariadb-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # 2.36.0
+        with:
+          php-version: '8.4'
+          extensions: zip
+          coverage: none
+      - run: bash scripts/test-mariadb-install.sh
