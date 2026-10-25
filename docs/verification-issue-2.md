@@ -25,12 +25,12 @@ Additional reviewed boundaries: root-only global configuration, server update au
 
 ## Executed verification matrix
 
-All commands ran from the issue worktree unless noted. Final local source/test run: **116 tests, 649 assertions**, no failures. Native integration is included in that total, not added again.
+All commands ran from the issue worktree unless noted. Final local source/test run: **118 tests, 664 assertions**, no failures. Native integration is included in that total, not added again.
 
 | Contract | Command / evidence | Outcome and limit |
 |---|---|---|
 | Manifest/lock | `composer validate --strict` | PASS |
-| Entire declared suite | `composer test -- --compact` | PASS: 116 tests / 649 assertions |
+| Entire declared suite | `composer test -- --compact` | PASS: 118 tests / 664 assertions |
 | Native packaged rc.2 discovery + admin UI/queue | `vendor/bin/pest tests/Integration --compact` | PASS: 3 tests / 66 assertions; real rc.2 application, Filament/Livewire, SQLite and database queue; stateful fake Pangolin HTTP API |
 | Invalid assignment / permission boundary | native integration and `SafePublicationTest`, `InfrastructureUiTest` | PASS: unassigned injected allocation rejected without publication/API effect; non-root infrastructure page forbidden |
 | Native final business effect | native integration | PASS: pending without alias → database `queue:work --once` → TCP+UDP resources/targets with matching 25565 → `games.example.com:25565`; bind IP unchanged; suspension disables both and clears alias, resume synchronizes; bulk allocation/node swap + explicit admin reapproval removes old TCP+UDP targets and publishes Site 8 / new-node.internal on exactly 25565, then opt-out deletes resources/targets |
@@ -52,9 +52,9 @@ All commands ran from the issue worktree unless noted. Final local source/test r
 
 Native integration sets the isolated application's environment to local only for actual plugin discovery, then testing for framework form assertions. It loads the checked-in Panel `.env.example`, never a developer's `.env`, and creates the missing application vendor symlink to the root test dependencies without replacing an existing directory. A clean-state replay with both local `.env` and prepared vendor symlink absent passes 3 tests / 47 assertions. The initial CI run exposed that missing autoloader prerequisite; the bootstrap was fixed instead of skipping native tests. Test helpers/fixtures stay under `tests/`; no product test-only seam, disabled check or timeout increase was added. Tests changed from remap expectations to explicit conflict rejection because the requested contract removes remapping. Snapshot/metadata/CI version changes follow the exact rc.2 target, not gate weakening. Existing tests were retained; source-shape guards are not presented as runtime evidence.
 
-## Open confirmed limitation (not fixed)
+## Pool-revocation correction
 
-S2 (Medium, pre-existing on the integration base): changing the approved pool does not disable an already published remote resource. `PublicationReconciler.php:237-242` rejects its reservation before mutation, leaving the prior remote enabled. Pool edits and `error` status are not revocation. Opt out and verify remote deletion before withdrawing ports; see raw-port-pool.md. This is separate from the corrected allocation-replacement B1, not a claim of complete pool-revocation coverage.
+S2 (Medium, pre-existing on the integration base, now fixed): changing the approved pool previously rejected reconciliation without disabling an already published resource. `PublicationReconciler.php:62-72` validates desired raw ports before updates and uses the existing ownership-/revision-checked disable path on failure, then reports the pool error. Stateful TCP+UDP regression in `RemoteOwnershipTest` verifies remote/local disabled flags, cleared endpoints, preserved IDs and successful recovery with the original pool. A failed API disable still cannot prove revoked exposure; retain ownership for retry and verify remote state. Pool edits converge through queued/scheduled reconciliation, not immediately at settings save.
 
 Correction evidence: `AllocationReplacementTest` passes 9 cases / 228 assertions (TCP, UDP, both × success, target failure/retry, deletion failure/retry). The reviewer's original standalone `testAllocationReplacementKeepsExactPortAndRemovesOldTarget` replay also passes 1 test / 5 assertions on the corrected working tree. S1's URL/pool negatives now supply a valid public host, and disabled/missing-target alias checks are explicit. All correction test hunks were manually reviewed for gate integrity: no removed tests, skips, disabled checks, timeout increases or loosened assertions. Only existing fixtures were extended; no production test seam.
 

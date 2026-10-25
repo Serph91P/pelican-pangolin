@@ -59,6 +59,17 @@ final class PublicationReconciler
                     }
                 }
                 $this->assertCurrent($publication);
+                try {
+                    foreach ($desired->resources as $resource) {
+                        if (! $resource->mode->isHttp()) {
+                            $this->portAllocator->allocate($resource->mode->value, $resource->targetPort, []);
+                        }
+                    }
+                } catch (\RuntimeException $exception) {
+                    // A withdrawn pool must stop existing exposure, not merely reject the next update.
+                    $this->disableLocked($publication);
+                    throw $exception;
+                }
                 $inventory = $this->client->listResources();
                 foreach ($desired->resources as $resource) {
                     $this->assertCurrent($publication);
