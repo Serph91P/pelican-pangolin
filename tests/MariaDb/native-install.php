@@ -38,7 +38,7 @@ $sqlFails = function (Closure $operation, int $error) use ($check): void {
 };
 $ledger = fn () => DB::table('migrations')->whereIn('migration', array_map(fn ($file) => basename($file, '.php'), $files))->orderBy('migration')->pluck('migration')->all();
 $check(Plugin::findOrFail('pelican-pangolin')->status === PluginStatus::NotInstalled, 'Must start not_installed');
-$invalid = in_array($scenario, ['duplicate', 'orphan', 'wrong-column', 'missing-fk', 'wrong-fk', 'wrong-index', 'extra-column', 'wrong-extra'], true);
+$invalid = in_array($scenario, ['duplicate', 'orphan', 'wrong-column', 'missing-fk', 'wrong-fk', 'wrong-index', 'extra-column', 'wrong-extra', 'wrong-check'], true);
 if ($scenario !== 'fresh') {
     // Native migrator seeds only 001/002; the old 003 DDL reproduces error 1059.
     Artisan::call('migrate', ['--path' => array_slice($files, 0, 2), '--realpath' => true, '--force' => true]);
@@ -50,7 +50,7 @@ if ($scenario !== 'fresh') {
     $check(DB::table($table)->count() === 0 && DB::table('pangolin_egg_profiles')->count() === 0 && DB::table('pangolin_node_mappings')->count() === 0, 'Original partial tables must be empty');
     $check(count(Schema::getIndexes($table)) === 2 && count(Schema::getForeignKeys($table)) === 1, 'Exact partial indexes/FK');
     $check(! Schema::hasTable('pangolin_server_publications') && ! Schema::hasTable('pangolin_managed_resources'), 'No later tables');
-    if (in_array($scenario, ['data', 'complete', 'duplicate', 'orphan'], true)) {
+    if (in_array($scenario, ['data', 'complete', 'duplicate', 'orphan', 'wrong-check'], true)) {
         DB::table('pangolin_egg_profiles')->insert(['id' => 1, 'egg_uuid' => 'e0a0a0a0-0000-4000-8000-000000000001', 'name' => 'Preserved']);
         DB::table($table)->insert(['id' => 41, 'egg_profile_id' => 1, 'allocation_position' => 0, 'mode' => 'tcp', 'domain' => 'keep.example']);
     }
@@ -79,6 +79,10 @@ if ($scenario !== 'fresh') {
     }
     if ($scenario === 'wrong-extra') {
         DB::statement("ALTER TABLE $table MODIFY updated_at timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP");
+    }
+    if ($scenario === 'wrong-check') {
+        DB::statement("ALTER TABLE $table ADD CONSTRAINT review_tcp_only CHECK (mode = 'tcp')");
+        $sqlFails(fn () => DB::table($table)->insert(['egg_profile_id' => 1, 'allocation_position' => 1, 'mode' => 'udp']), 4025);
     }
     if ($scenario === 'extra-column') {
         DB::statement("ALTER TABLE $table ADD unexpected int");

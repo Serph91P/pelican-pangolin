@@ -13,11 +13,11 @@ cleanup() {
     printf 'Could not clean up test network %s\n' "$name" >&2
 }
 if [[ $# -eq 0 ]]; then
-    set -- fresh partial data complete duplicate orphan wrong-column missing-fk wrong-fk wrong-index extra-column wrong-extra
+    set -- fresh partial data complete duplicate orphan wrong-column missing-fk wrong-fk wrong-index extra-column wrong-extra wrong-check
 fi
 for scenario in "$@"; do
     case "$scenario" in
-        fresh|partial|data|complete|duplicate|orphan|wrong-column|missing-fk|wrong-fk|wrong-index|extra-column|wrong-extra) ;;
+        fresh|partial|data|complete|duplicate|orphan|wrong-column|missing-fk|wrong-fk|wrong-index|extra-column|wrong-extra|wrong-check) ;;
         *) printf 'Unknown test scenario: %s\n' "$scenario" >&2; exit 1 ;;
     esac
 done

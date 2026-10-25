@@ -65,6 +65,10 @@ return new class extends Migration
         if (strtolower($tables[$table]['engine'] ?? '') !== 'innodb') {
             $fail();
         }
+        if (DB::table('information_schema.table_constraints')->where('table_schema', DB::connection()->getDatabaseName())
+            ->where('table_name', $table)->whereNotIn('constraint_type', ['PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE'])->exists()) {
+            $fail();
+        }
         $foreign = Schema::getForeignKeys($table);
         if (count($foreign) !== 1 || $foreign[0]['columns'] !== ['egg_profile_id']
             || $foreign[0]['foreign_schema'] !== DB::connection()->getDatabaseName()
