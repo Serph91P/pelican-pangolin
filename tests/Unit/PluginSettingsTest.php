@@ -26,7 +26,7 @@ it('never returns a stored token to the settings form and retains it on blank sa
 });
 
 it('rejects settings without HTTPS or valid protocol-specific pools', function (array $data) {
-    (new PluginSettings)->validate($data);
+    (new PluginSettings)->validate(['public_host' => 'games.example.com', ...$data]);
 })->with([
     [['api_url' => 'http://pangolin.example', 'organization_id' => 'acme', 'token' => 'x', 'tcp_ports' => '25565', 'udp_ports' => '19132']],
     [['api_url' => 'https://user@pangolin.example', 'organization_id' => 'acme', 'token' => 'x', 'tcp_ports' => '25565', 'udp_ports' => '19132']],

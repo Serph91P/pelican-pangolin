@@ -15,6 +15,7 @@ use PelicanDev\PelicanPangolin\Filament\Admin\Resources\ServerPublications\Pages
 use PelicanDev\PelicanPangolin\Jobs\ReconcileServerPublication;
 use PelicanDev\PelicanPangolin\Jobs\RemoveServerPublication;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
+use PelicanDev\PelicanPangolin\Services\AllocationAliasManager;
 
 final class ServerPublicationResource extends Resource
 {
@@ -40,7 +41,7 @@ final class ServerPublicationResource extends Resource
             IconColumn::make('opted_in')->boolean(),
             TextColumn::make('resources.pangolin_resource_id')->label('Resource IDs')->badge(),
             TextColumn::make('resources.public_port')->label('Public ports')->badge(),
-            TextColumn::make('resources.confirmed_domain')->label('Confirmed URLs')->formatStateUsing(fn (string $state): string => "https://{$state}")->badge(),
+            TextColumn::make('confirmed_endpoints')->label('API-synchronized endpoints (reachability not tested)')->state(fn (ServerPublication $record): array => $record->status === SyncStatus::Synced && $record->opted_in && ! $record->suspended ? $record->resources()->where('enabled', true)->whereNotNull('confirmed_endpoint')->pluck('confirmed_endpoint')->all() : [])->listWithLineBreaks()->copyable(),
             TextColumn::make('last_synced_at')->dateTime()->placeholder('Never'),
             TextColumn::make('last_error')->color('danger')->wrap()->limit(120),
         ])->filters([
@@ -52,6 +53,7 @@ final class ServerPublicationResource extends Resource
             }),
 
             Action::make('opt_out')->color('danger')->requiresConfirmation()->authorize(fn (ServerPublication $record): bool => $record->server !== null && (user()?->can('update', $record->server) ?? false))->action(function (ServerPublication $record): void {
+                app(AllocationAliasManager::class)->restore($record);
                 $record->forceFill([
                     'opted_in' => false,
                     'deletion_pending' => true,

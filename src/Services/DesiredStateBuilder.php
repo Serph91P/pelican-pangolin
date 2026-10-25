@@ -43,9 +43,17 @@ final class DesiredStateBuilder
                 throw new DomainException('The selected allocation is invalid.');
             }
 
-            $configuration = $overrides[$allocationId] ?? $profileRules[$position] ?? null;
-
+            $configuration = $overrides[$allocationId] ?? null;
             if ($configuration === null) {
+                foreach ($profileRules as $rule) {
+                    if ((int) ($rule['allocation_port'] ?? 0) === $targetPort) {
+                        $configuration = $rule;
+                        break;
+                    }
+                }
+            }
+
+            if ($configuration === null || ! in_array($configuration['purpose'] ?? null, ['game', 'query'], true)) {
                 continue;
             }
 
@@ -70,12 +78,14 @@ final class DesiredStateBuilder
                 }
             }
 
-            $resources[] = new DesiredResource(
-                allocationId: $allocationId,
-                targetPort: $targetPort,
-                mode: $mode,
-                domain: $domain,
-            );
+            foreach ($mode === PublicationMode::Both ? [PublicationMode::Tcp, PublicationMode::Udp] : [$mode] as $protocol) {
+                $resources[] = new DesiredResource(
+                    allocationId: $allocationId,
+                    targetPort: $targetPort,
+                    mode: $protocol,
+                    domain: $domain,
+                );
+            }
         }
 
         return new DesiredPublication(

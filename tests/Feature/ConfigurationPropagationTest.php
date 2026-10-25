@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use PelicanDev\PelicanPangolin\Jobs\ReconcileServerPublication;
+use PelicanDev\PelicanPangolin\Jobs\RemoveServerPublication;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
 use PelicanDev\PelicanPangolin\Services\PublicationRefreshService;
 
@@ -73,4 +74,11 @@ it('refreshes affected publications after node mapping and Egg profile changes',
     expect($publication->fresh()->desired_revision)->toBe(3)
         ->and($publication->fresh()->desired_state['mapping']['enabled'])->toBeTrue();
     Queue::assertPushed(ReconcileServerPublication::class, 2);
+
+    // Query-builder deletion bypasses native observers; the scheduler must recover it.
+    DB::table('servers')->where('id', 12)->delete();
+    $service->refreshAll();
+    expect($publication->fresh()->opted_in)->toBeFalse()
+        ->and($publication->fresh()->deletion_pending)->toBeTrue();
+    Queue::assertPushed(RemoveServerPublication::class);
 });

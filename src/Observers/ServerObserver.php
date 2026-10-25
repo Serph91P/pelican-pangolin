@@ -6,6 +6,7 @@ use App\Models\Server;
 use PelicanDev\PelicanPangolin\Enums\SyncStatus;
 use PelicanDev\PelicanPangolin\Jobs\RemoveServerPublication;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
+use PelicanDev\PelicanPangolin\Services\AllocationAliasManager;
 use PelicanDev\PelicanPangolin\Services\PublicationRefreshService;
 
 final class ServerObserver
@@ -26,6 +27,8 @@ final class ServerObserver
         if ($publication === null) {
             return;
         }
+
+        app(AllocationAliasManager::class)->restore($publication);
 
         $publication->forceFill([
             'opted_in' => false,

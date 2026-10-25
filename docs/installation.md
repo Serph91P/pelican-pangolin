@@ -9,9 +9,17 @@
 
 The token field always displays blank. Leaving it blank retains the existing value. Settings are validated with read-only inventory requests before being written. Saving settings restarts Pelican queue workers so subsequent reconciliation uses the new endpoint, token, and port pools.
 
-## Upgrade
+## Upgrade to 1.1.0
 
-Back up the Pelican database, replace the plugin files, run Pelican's plugin upgrade flow, and restart queue workers. Do not remove plugin tables while managed remote IDs remain.
+Back up the Pelican database and plugin files. Target Pelican `1.0.0-rc.2` and PHP 8.4/8.5; older targets are not verified. Opt out existing publications and complete remote cleanup before replacing a remapped-port setup. Run the native plugin upgrade flow and restart queue workers.
+
+Configure `PANGOLIN_PUBLIC_HOST` explicitly. Existing positional Egg rules and overrides without `purpose` do NOT become approved automatically. Review each rule, supply its exact `allocation_port` and `game`/`query` purpose, then re-approve the desired allocations/protocols. `allocation_position` remains a unique rule identifier for schema compatibility; it no longer selects an allocation by list position. Legacy remapped rows intentionally fail with a cleanup/reapproval instruction, rather than displaying the wrong endpoint.
+
+Legacy stored remote IDs are checked against their original deterministic resource name; new records use a durable random ownership name. A mismatched name or unexpected target requires operator investigation: do not edit IDs or rename foreign resources just to make sync pass. Manual aliases are preserved; use the confirmed endpoint column when an existing alias intentionally differs.
+
+## Rollback
+
+Opt out all publications, run the queue until resource cleanup completes, and verify no managed ownership rows remain before reverting plugin files/schema using Pelican's native flow. The new down migration refuses to discard active ownership rows. Do not force-drop tables. Only unchanged plugin-owned aliases are cleared; manual edits remain. Restoring a database backup also restores IDs and requires comparing remote state before enabling workers. Infrastructure rollback is a separate reviewed Git/Dockhand handoff, described in [raw port pools](raw-port-pool.md).
 
 ## Uninstall
 

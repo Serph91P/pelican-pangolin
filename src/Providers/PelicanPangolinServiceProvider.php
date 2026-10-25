@@ -59,6 +59,7 @@ final class PelicanPangolinServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->loadViewsFrom(__DIR__.'/../../resources/views', 'pelican-pangolin');
 
         Server::resolveRelationUsing('pangolinPublication', fn (Server $server) => $server->hasOne(ServerPublication::class));
         Node::resolveRelationUsing('pangolinMapping', fn (Node $node) => $node->hasOne(NodeMapping::class));

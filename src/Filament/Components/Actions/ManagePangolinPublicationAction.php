@@ -12,11 +12,14 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use PelicanDev\PelicanPangolin\Enums\PublicationMode;
 use PelicanDev\PelicanPangolin\Enums\SyncStatus;
 use PelicanDev\PelicanPangolin\Jobs\ReconcileServerPublication;
 use PelicanDev\PelicanPangolin\Jobs\RemoveServerPublication;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
+use PelicanDev\PelicanPangolin\Services\AllocationAliasManager;
 use PelicanDev\PelicanPangolin\Services\PublicationStateSnapshot;
 
 final class ManagePangolinPublicationAction extends Action
@@ -60,11 +63,23 @@ final class ManagePangolinPublicationAction extends Action
                         ->options(fn (Server $record) => $record->allocations->mapWithKeys(fn ($allocation): array => [$allocation->id => $allocation->address]))
                         ->distinct()->required(),
                     Select::make('mode')->options(collect(PublicationMode::cases())->mapWithKeys(fn (PublicationMode $mode): array => [$mode->value => ucfirst($mode->value)]))->required()->live(),
+                    Select::make('purpose')->options(['game' => 'Game', 'query' => 'Query', 'ignored' => 'Do not publish'])->required(),
                     TextInput::make('domain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),
                     TextInput::make('subdomain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),
                 ])->columns(4)->columnSpanFull()->visible(fn (Get $get): bool => (bool) $get('opted_in')),
             ])
             ->action(function (Server $record, array $data): void {
+                abort_unless(user()?->can('update', $record) ?? false, 403);
+                $record->load(['egg', 'allocations']);
+                Validator::make($data, [
+                    'opted_in' => ['required', 'boolean'],
+                    'overrides' => ['array', 'max:1024'],
+                    'overrides.*.allocation_id' => ['required', 'integer', 'distinct', Rule::in($record->allocations->modelKeys())],
+                    'overrides.*.mode' => ['required', Rule::enum(PublicationMode::class)],
+                    'overrides.*.purpose' => ['required', Rule::in(['game', 'query', 'ignored'])],
+                    'overrides.*.domain' => ['nullable', 'string', 'max:253'],
+                    'overrides.*.subdomain' => ['nullable', 'string', 'max:253'],
+                ])->validate();
                 DB::transaction(function () use ($record, $data): void {
                     $publication = ServerPublication::query()->firstOrCreate(
                         ['server_id' => $record->id],
@@ -72,6 +87,7 @@ final class ManagePangolinPublicationAction extends Action
                     );
 
                     if (! ($data['opted_in'] ?? false)) {
+                        app(AllocationAliasManager::class)->restore($publication);
                         $publication->forceFill([
                             'opted_in' => false,
                             'deletion_pending' => true,

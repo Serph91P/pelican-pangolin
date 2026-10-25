@@ -10,6 +10,8 @@ use PelicanDev\PelicanPangolin\Enums\PublicationMode;
  * @property int $id
  * @property int $egg_profile_id
  * @property int $allocation_position
+ * @property int|null $allocation_port
+ * @property string|null $purpose
  * @property PublicationMode $mode
  * @property string|null $domain
  * @property string|null $subdomain
@@ -25,6 +27,7 @@ final class EggProfileRule extends Model
     {
         return [
             'allocation_position' => 'integer',
+            'allocation_port' => 'integer',
             'mode' => PublicationMode::class,
         ];
     }

@@ -11,6 +11,7 @@ cp -R \
     "$root/database" \
     "$root/docs" \
     "$root/src" \
+    "$root/resources" \
     "$root/CHANGELOG.md" \
     "$root/LICENSE" \
     "$root/README.md" \

@@ -57,6 +57,7 @@ it('disables a suspended publication before building unavailable desired state',
     ]);
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldReceive('updateResource')->once()->with(101, ['enabled' => false])->andReturn(['resourceId' => 101]);
+        $mock->shouldReceive('getResource')->once()->with(101)->andReturn(['resourceId' => 101, 'name' => 'pelican-10b8c7c9ee30-60']);
     });
     $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('27015', '27015'), new ResourceNaming);
 
@@ -119,6 +120,8 @@ it('ignores an in-flight removal generation after re-opt-in', function () {
         'public_port' => 25565,
     ]);
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) use ($publication) {
+        $mock->shouldReceive('getResource')->once()->with(111)->andReturn(['resourceId' => 111, 'name' => 'pelican-6380ea5ac2b0-70']);
+        $mock->shouldReceive('listTargets')->once()->with(111)->andReturn([]);
         $mock->shouldReceive('deleteResource')->once()->with(111)->andReturnUsing(function () use ($publication): void {
             $publication->forceFill([
                 'opted_in' => true,

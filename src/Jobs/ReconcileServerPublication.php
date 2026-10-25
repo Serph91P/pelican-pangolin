@@ -53,7 +53,7 @@ final class ReconcileServerPublication implements ShouldQueue
     public function handle(PublicationReconciler $reconciler, DesiredStateBuilder $builder): void
     {
         $publication = ServerPublication::query()->find($this->publicationId);
-        if ($publication === null || $publication->desired_revision !== $this->revision) {
+        if ($publication === null || ! $publication->opted_in || $publication->desired_revision !== $this->revision) {
             return;
         }
 
@@ -86,7 +86,7 @@ final class ReconcileServerPublication implements ShouldQueue
             return;
         }
 
-        ServerPublication::query()->whereKey($this->publicationId)->update([
+        ServerPublication::query()->whereKey($this->publicationId)->where('desired_revision', $this->revision)->update([
             'status' => SyncStatus::Error->value,
             'last_error' => $this->sanitizeError($exception->getMessage()),
         ]);

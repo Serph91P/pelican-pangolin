@@ -31,15 +31,7 @@ final readonly class PublicPortAllocator
             }
         }
 
-        foreach ($ranges as $range) {
-            for ($port = $range->start; $port <= $range->end; $port++) {
-                if (! isset($reservedLookup[$port])) {
-                    return $port;
-                }
-            }
-        }
-
-        throw new RuntimeException('No '.strtoupper($protocol).' public ports are available.');
+        throw new RuntimeException('No '.strtoupper($protocol).' public ports are available for the exact allocation port; resolve the conflict or extend the approved pool. Port remapping is not supported.');
     }
 
     /** @return list<PortRange> */
@@ -53,6 +45,19 @@ final readonly class PublicPortAllocator
 
         $ranges = array_map(PortRange::parse(...), $values);
         usort($ranges, fn (PortRange $a, PortRange $b): int => $a->start <=> $b->start);
+
+        $count = 0;
+        foreach ($ranges as $range) {
+            $count += $range->end - $range->start + 1;
+            if ($range->start < 1024 || $count > 1024) {
+                throw new InvalidArgumentException('Pools require ports >= 1024 and at most 1024 ports per protocol.');
+            }
+            foreach ([2022, 8080, 8443, 51820, 51821] as $reserved) {
+                if ($range->contains($reserved)) {
+                    throw new InvalidArgumentException('Pool overlaps a reserved management or tunnel port.');
+                }
+            }
+        }
 
         for ($index = 1; $index < count($ranges); $index++) {
             if ($ranges[$index]->start <= $ranges[$index - 1]->end) {

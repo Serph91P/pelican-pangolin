@@ -2,12 +2,12 @@
 
 use PelicanDev\PelicanPangolin\Services\PublicPortAllocator;
 
-it('prefers the allocation port and otherwise chooses the lowest free pool port', function () {
+it('uses the exact approved allocation port independently per protocol', function () {
     $allocator = PublicPortAllocator::from('25565,30000-30002', '25565,30000-30002');
 
     expect($allocator->allocate('tcp', 25565, []))->toBe(25565)
-        ->and($allocator->allocate('tcp', 25565, [25565, 30000]))->toBe(30001)
-        ->and($allocator->allocate('udp', 25565, [25565]))->toBe(30000);
+        ->and($allocator->allocate('tcp', 30001, [25565, 30000]))->toBe(30001)
+        ->and($allocator->allocate('udp', 25565, []))->toBe(25565);
 });
 
 it('rejects invalid or overlapping port pools', function (string $pool) {
