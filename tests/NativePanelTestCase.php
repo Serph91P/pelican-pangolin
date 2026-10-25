@@ -13,6 +13,11 @@ abstract class NativePanelTestCase extends TestCase
     {
         $root = dirname(__DIR__);
         $panel = $root.'/pelican-panel';
+        // The native PluginService loads the application's own autoloader.
+        // Composer installs this test project's dependencies one directory above it.
+        if (! file_exists($panel.'/vendor') && ! is_link($panel.'/vendor')) {
+            symlink($root.'/vendor', $panel.'/vendor');
+        }
         if (! is_file($root.'/build/pelican-pangolin.zip')) {
             throw new \RuntimeException('Build the plugin before native integration tests.');
         }
@@ -25,6 +30,7 @@ abstract class NativePanelTestCase extends TestCase
         $metadata['meta'] = ['status' => 'enabled'];
         file_put_contents($manifest, json_encode($metadata, JSON_THROW_ON_ERROR));
         $app = require $panel.'/bootstrap/app.php';
+        $app->loadEnvironmentFrom('.env.example');
         // rc.2 intentionally skips plugins in APP_ENV=testing. Use local mode
         // with an explicitly isolated in-memory database before provider registration.
         $app->afterBootstrapping(LoadConfiguration::class, function ($app): void {

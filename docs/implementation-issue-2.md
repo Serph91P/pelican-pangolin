@@ -21,6 +21,8 @@ Ruling: previous positional Egg rules require explicit purpose approval on upgra
 - Dependency audit initially found CVE-2026-108082 in HttpFoundation 8.0.x. Official advisory checked; allowed compatible patched 7.4.21 selected via dev constraint ^7.4.19. Final composer audit has zero advisories.
 
 ## Progress
+First CI detected the native Panel autoloader prerequisite missing from a fresh checkout. Reproduced 3 failures without local .env/vendor, fixed bootstrap to create the application dependency symlink and use checked-in .env.example; clean-state 3/47 and full 103/391 now pass. Native tests were not skipped or weakened.
+
 Implementation and author self-review complete; PR/CI delivery follows. Final local checks: 103 tests / 391 assertions; native packaged rc.2 integration 3 tests / 47 assertions; composer validate/lint/analyse/audit, ZIP build and diff check pass. See verification-issue-2.md for audit and honest matrix.
 
 RED→GREEN evidence includes stale alias application, stale snapshot revision overwrite, existing reservation outside revised pool, bulk server-deletion orphan cleanup, and unexpected target cascading deletion prevention. Existing tests retained; remapping expectations changed to explicit rejection per contract.

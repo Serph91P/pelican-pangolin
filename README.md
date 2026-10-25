@@ -43,7 +43,10 @@ See [raw port pools](docs/raw-port-pool.md) before enabling TCP or UDP publicati
 ## Development
 
 ```bash
+git clone https://github.com/pelican/panel.git pelican-panel
+git -C pelican-panel checkout f64a167eea349bfbb89cda8732eacf682a82a4b3
 composer install
+scripts/build-plugin.sh
 composer test
 composer lint
 composer analyse
