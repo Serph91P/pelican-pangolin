@@ -32,6 +32,24 @@ it('does not mark a superseded API operation synced or overwrite its newer statu
         ->and($publication->resources()->firstOrFail()->confirmed_endpoint)->toBeNull();
 });
 
+it('stops obsolete allocation deletion when the revision changes during ownership checks', function () {
+    $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'opted_in' => true]);
+    $publication->resources()->create(['allocation_id' => 1, 'mode' => 'tcp', 'public_port' => 25565, 'pangolin_resource_id' => 91, 'pangolin_target_id' => 92, 'ownership_name' => 'our-random-identity']);
+    $client = Mockery::mock(PangolinClient::class);
+    $client->shouldReceive('listResources')->andReturn([]);
+    $client->shouldReceive('getResource')->with(91)->andReturn(['resourceId' => 91, 'name' => 'our-random-identity']);
+    $client->shouldReceive('listTargets')->with(91)->andReturnUsing(function () use ($publication) {
+        ServerPublication::whereKey($publication->id)->update(['desired_revision' => 2, 'status' => 'pending']);
+
+        return [['targetId' => 92]];
+    });
+    $client->shouldNotReceive('deleteResource');
+    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    expect(fn () => $reconciler->reconcile($publication, new DesiredPublication(1, 8, 'new-node.internal', [])))->toThrow(DomainException::class, 'stale');
+    expect($publication->fresh()->status->value)->toBe('pending')
+        ->and($publication->resources()->count())->toBe(1);
+});
+
 it('does not let an exhausted old job overwrite a new revision', function () {
     $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'desired_revision' => 2, 'status' => 'pending']);
     (new ReconcileServerPublication($publication->id, 12, 1))->failed(new RuntimeException('old failure'));

@@ -10,6 +10,7 @@ References are candidate source locations, not claims of production exploitation
 
 | Severity | Finding and fix | Candidate source | Evidence |
 |---|---|---|---|
+| High | B1: obsolete allocation reservations blocked a same-port successor and left the old target active. Remove obsolete owned resources before fresh inventory/reservation; preserve HTTP method reuse and recheck revision after ownership reads before delete. | `src/Services/PublicationReconciler.php:52-67,299-318` | TCP/UDP/Both replacement RED→GREEN; `AllocationReplacementTest` success/deletion retry/target retry; `RevisionSafetyTest`; native UI/DB-queue transfer |
 | High | Positional/unknown approval could publish an unintended allocation after reordering. Require exact-port Egg rules or assigned allocation overrides AND explicit game/query purpose; TCP+UDP expands into two resources. | `src/Services/DesiredStateBuilder.php:46-87` | `SafePublicationTest`, `DesiredStateBuilderTest`, native forged-allocation rejection |
 | High | Stored IDs alone did not establish current remote ownership. Check ID/name, persist random names before create, reject conflicting identities/unexpected targets and keep ownership records through partial failures. | `src/Services/PublicationReconciler.php:134-219,252-256,296-328` | `RemoteOwnershipTest`, `PublicationReconcilerTest` |
 | High | Overlapping jobs/stale revisions could overwrite newer state. Serialize remote writes with a shared cache lock, check revisions between effects and condition final updates; lock snapshot rows and refresh models. | `src/Services/PublicationReconciler.php:31-77`; `src/Services/PublicationStateSnapshot.php:17-26`; `src/Jobs/ReconcileServerPublication.php:55-57,89` | `RevisionSafetyTest`, stale snapshot RED→GREEN in `LifecycleObserverTest` |
@@ -24,15 +25,15 @@ Additional reviewed boundaries: root-only global configuration, server update au
 
 ## Executed verification matrix
 
-All commands ran from the issue worktree unless noted. Final local source/test run: **103 tests, 391 assertions**, no failures. Native integration is included in that total, not added again.
+All commands ran from the issue worktree unless noted. Final local source/test run: **116 tests, 649 assertions**, no failures. Native integration is included in that total, not added again.
 
 | Contract | Command / evidence | Outcome and limit |
 |---|---|---|
 | Manifest/lock | `composer validate --strict` | PASS |
-| Entire declared suite | `composer test -- --compact` | PASS: 103 tests / 391 assertions |
-| Native packaged rc.2 discovery + admin UI/queue | `vendor/bin/pest tests/Integration --compact` | PASS: 3 tests / 47 assertions; real rc.2 application, Filament/Livewire, SQLite and database queue; stateful fake Pangolin HTTP API |
+| Entire declared suite | `composer test -- --compact` | PASS: 116 tests / 649 assertions |
+| Native packaged rc.2 discovery + admin UI/queue | `vendor/bin/pest tests/Integration --compact` | PASS: 3 tests / 66 assertions; real rc.2 application, Filament/Livewire, SQLite and database queue; stateful fake Pangolin HTTP API |
 | Invalid assignment / permission boundary | native integration and `SafePublicationTest`, `InfrastructureUiTest` | PASS: unassigned injected allocation rejected without publication/API effect; non-root infrastructure page forbidden |
-| Native final business effect | native integration | PASS: pending without alias → database `queue:work --once` → TCP+UDP resources/targets with matching 25565 → `games.example.com:25565`; bind IP unchanged; suspension disables both and clears alias, resume synchronizes, opt-out deletes resources/targets |
+| Native final business effect | native integration | PASS: pending without alias → database `queue:work --once` → TCP+UDP resources/targets with matching 25565 → `games.example.com:25565`; bind IP unchanged; suspension disables both and clears alias, resume synchronizes; bulk allocation/node swap + explicit admin reapproval removes old TCP+UDP targets and publishes Site 8 / new-node.internal on exactly 25565, then opt-out deletes resources/targets |
 | Manual alias/IPv6/native consumers | `AllocationAliasTest` | PASS: native `address`/`alias`, manual values retained; bind IP/port unchanged |
 | Conflict/exhaustion, unsafe purpose, stale revision, retry/partial failure | Unit/Feature suites | PASS: no remapping/adoption, persisted ownership after failure and idempotent retry, stale terminal update rejected |
 | Concurrency | `RevisionSafetyTest`, `LifecycleObserverTest`, `AllocationAliasTest` | PASS for controlled stale-order/interleaved state and lock-contention fixtures. NOT RUN: multi-process MySQL/Redis load test; local DB is SQLite and cache lock test uses array store |
@@ -50,6 +51,12 @@ All commands ran from the issue worktree unless noted. Final local source/test r
 | Production install/Infra apply/restart | outside delivery authorization | NOT RUN; no changes made |
 
 Native integration sets the isolated application's environment to local only for actual plugin discovery, then testing for framework form assertions. It loads the checked-in Panel `.env.example`, never a developer's `.env`, and creates the missing application vendor symlink to the root test dependencies without replacing an existing directory. A clean-state replay with both local `.env` and prepared vendor symlink absent passes 3 tests / 47 assertions. The initial CI run exposed that missing autoloader prerequisite; the bootstrap was fixed instead of skipping native tests. Test helpers/fixtures stay under `tests/`; no product test-only seam, disabled check or timeout increase was added. Tests changed from remap expectations to explicit conflict rejection because the requested contract removes remapping. Snapshot/metadata/CI version changes follow the exact rc.2 target, not gate weakening. Existing tests were retained; source-shape guards are not presented as runtime evidence.
+
+## Open confirmed limitation (not fixed)
+
+S2 (Medium, pre-existing on the integration base): changing the approved pool does not disable an already published remote resource. `PublicationReconciler.php:237-242` rejects its reservation before mutation, leaving the prior remote enabled. Pool edits and `error` status are not revocation. Opt out and verify remote deletion before withdrawing ports; see raw-port-pool.md. This is separate from the corrected allocation-replacement B1, not a claim of complete pool-revocation coverage.
+
+Correction evidence: `AllocationReplacementTest` passes 9 cases / 228 assertions (TCP, UDP, both × success, target failure/retry, deletion failure/retry). The reviewer's original standalone `testAllocationReplacementKeepsExactPortAndRemovesOldTarget` replay also passes 1 test / 5 assertions on the corrected working tree. S1's URL/pool negatives now supply a valid public host, and disabled/missing-target alias checks are explicit. All correction test hunks were manually reviewed for gate integrity: no removed tests, skips, disabled checks, timeout increases or loosened assertions. Only existing fixtures were extended; no production test seam.
 
 ## Operational limits and handoff
 

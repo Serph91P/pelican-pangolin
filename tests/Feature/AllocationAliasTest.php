@@ -41,7 +41,7 @@ it('applies a public host without changing bind data or manual aliases then rest
     expect(DB::table('allocations')->find(1)->ip_alias)->toBe('admin-edit.example.com');
 });
 
-it('never aliases a remapped, unassigned, disabled or unconfirmed allocation', function () {
+it('never aliases a remapped or unassigned allocation', function () {
     $manager = new AllocationAliasManager;
     $this->publication->resources()->where('allocation_id', 1)->update(['public_port' => 30000]);
     $manager->apply($this->publication, 'games.example.com');
@@ -51,6 +51,15 @@ it('never aliases a remapped, unassigned, disabled or unconfirmed allocation', f
     $manager->apply($this->publication, 'games.example.com');
     expect(DB::table('allocations')->find(1)->ip_alias)->toBeNull();
 });
+
+it('never aliases a disabled resource or one without a confirmed target', function (array $state) {
+    $this->publication->resources()->where('allocation_id', 1)->update($state);
+    (new AllocationAliasManager)->apply($this->publication, 'games.example.com');
+    expect(DB::table('allocations')->find(1)->ip_alias)->toBeNull();
+})->with([
+    'disabled' => [['enabled' => false]],
+    'missing target' => [['pangolin_target_id' => null]],
+]);
 
 it('does not apply an alias from a stale synchronized publication after opt-out', function () {
     $stale = $this->publication;

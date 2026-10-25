@@ -29,4 +29,12 @@ RED→GREEN evidence includes stale alias application, stale snapshot revision o
 
 Ruling: HTTP resource method changes reuse the owned row; raw Both expands before the client boundary. Legacy remote IDs require their original deterministic name, while new resources have persisted random ownership names. Unexpected targets require operator cleanup rather than deletion.
 
-Final self-review: Ponytail/gstack checklist and test-value rubric applied by author; independent same-card developer-reviewer is still required. No production access assumed and no external TCP/UDP test performed. Keep worktree, dependency checkout and test artifacts for reviewer/owner acceptance; no cleanup before their lifecycle gate.
+Final self-review: Ponytail/gstack checklist and test-value rubric applied by author. No production access assumed and no external TCP/UDP test performed. Keep worktree, dependency checkout and test artifacts for reviewer/owner acceptance; no cleanup before their lifecycle gate.
+
+## Review correction round
+
+B1 (High): an obsolete allocation reserved its successor's exact port, so a transfer failed before cleanup and left the old target enabled. Reproduced TCP/UDP/Both replacement failures before changing production code. Remove obsolete owned resources before fresh remote inventory/reservation; preserve HTTP/HTTPS row reuse. Check revision again after remote ownership/target reads, immediately before deletion; its regression also failed before the guard was added. The existing shared lock, ownership verification and durable failure records remain in force. New stateful HTTP cases cover successful replacement, deletion failure/retry, target creation failure/retry and idempotent repeat, with old IDs absent and new host/site/exact port/alias verified. Native rc.2 UI → database queue now also exercises the allocation/node swap and reapproval, with old TCP+UDP targets removed.
+
+S1: provide a valid public host in the existing URL/pool rejection table so each intended guard is reached; cover disabled/missing-target alias cases separately. S2: pool revocation does not disable existing remote exposure; document this pre-existing limitation separately rather than claim it fixed. No extra product redesign or review pipeline.
+
+Ruling: cleanup precedes successor creation, accepting an interruption during transfer instead of keeping an obsolete target exposed. Remote deletion failures retain ownership for retry and cannot be presented as completed cleanup. No atomic remote transaction or live reachability is claimed.

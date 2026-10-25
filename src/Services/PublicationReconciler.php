@@ -49,17 +49,20 @@ final class PublicationReconciler
                 if (array_any($desired->resources, fn (DesiredResource $resource): bool => ! $resource->mode->isHttp())) {
                     PluginSettings::validatePublicHost($host);
                 }
+                // Release obsolete ownership before reserving exact ports; then read fresh remote inventory.
+                foreach ($publication->resources()->get() as $owned) {
+                    $retained = array_any($desired->resources, fn (DesiredResource $resource): bool => $resource->allocationId === $owned->allocation_id
+                        && ($resource->mode === $owned->mode || ($resource->mode->isHttp() && $owned->mode->isHttp())));
+                    if (! $retained) {
+                        $this->assertCurrent($publication);
+                        $this->removeResource($publication, $owned);
+                    }
+                }
+                $this->assertCurrent($publication);
                 $inventory = $this->client->listResources();
                 foreach ($desired->resources as $resource) {
                     $this->assertCurrent($publication);
                     $this->reconcileResource($publication, $desired, $resource, $inventory, $host);
-                }
-                $keys = array_map(fn (DesiredResource $resource): string => "{$resource->allocationId}:{$resource->mode->value}", $desired->resources);
-                foreach ($publication->resources()->get() as $owned) {
-                    if (! in_array("{$owned->allocation_id}:{$owned->mode->value}", $keys, true)) {
-                        $this->assertCurrent($publication);
-                        $this->removeResource($owned);
-                    }
                 }
                 $this->assertCurrent($publication);
                 ServerPublication::query()->whereKey($publication->id)->where('desired_revision', $desired->revision)->update([
@@ -123,7 +126,7 @@ final class PublicationReconciler
         app(AllocationAliasManager::class)->restore($publication);
         foreach ($publication->resources()->get() as $owned) {
             $this->assertCurrent($publication);
-            $this->removeResource($owned);
+            $this->removeResource($publication, $owned);
         }
         ServerPublication::query()->whereKey($publication->id)->where('opted_in', false)->where('desired_revision', $revision)
             ->update(['status' => SyncStatus::Disabled, 'last_error' => null, 'deletion_pending' => false]);
@@ -293,7 +296,7 @@ final class PublicationReconciler
         return [$matches[0]['domainId'], $fullDomain === $base ? null : substr($fullDomain, 0, -strlen(".{$base}"))];
     }
 
-    private function removeResource(ManagedResource $owned): void
+    private function removeResource(ServerPublication $publication, ManagedResource $owned): void
     {
         if ($owned->pangolin_resource_id !== null) {
             try {
@@ -304,6 +307,7 @@ final class PublicationReconciler
                         throw new DomainException('Unexpected target on the owned resource; operator cleanup required before deletion.');
                     }
                 }
+                $this->assertCurrent($publication);
                 $this->client->deleteResource($id);
             } catch (PangolinApiException $exception) {
                 if ($exception->status !== 404) {

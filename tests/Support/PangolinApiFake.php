@@ -14,6 +14,8 @@ final class PangolinApiFake
 
     public bool $failNextTarget = false;
 
+    public bool $failNextDelete = false;
+
     private int $id = 90;
 
     public function install(): void
@@ -51,6 +53,11 @@ final class PangolinApiFake
                 $id = (int) $matches[1];
                 if (! isset($this->resources[$id])) {
                     return Http::response(['success' => false], 404);
+                }
+                if ($method === 'DELETE' && $this->failNextDelete) {
+                    $this->failNextDelete = false;
+
+                    return Http::response(['success' => false, 'message' => 'Temporary deletion failure'], 503);
                 }
                 if ($method === 'POST') {
                     $this->resources[$id] = [...$this->resources[$id], ...$body];

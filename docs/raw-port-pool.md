@@ -48,4 +48,6 @@ Commit reviewed infrastructure changes to the responsible Git repository and han
 
 The UI distinguishes generated output from applied infrastructure (unknown) and external reachability (not tested). `synced` means API resources/targets were synchronized, not that a game connection works. Infra must verify host/provider firewall, listeners, container mappings and real external TCP AND UDP traffic against an actual test game/query listener. A UDP send without a response is not success evidence.
 
+Before withdrawing a pool port, opt out its publications and verify remote deletion. Merely removing it from plugin settings rejects subsequent reconciliation but does **not** disable an already enabled Pangolin resource (known pre-existing limitation S2). An `error` status, missing alias or changed generated snippet is not proof that exposure ended. If cleanup fails, retain ownership records and resolve API/ownership issues; no successful revocation can be claimed until remote state is verified.
+
 For rollback, opt out affected servers and wait for owned resources to be removed first. Review the infrastructure Git diff, remove only this approved pool's no-longer-used entries, and hand off restart/recreation to Infra/Dockhand. Preserve existing ports/services. No production mutation, restart or deployment is part of plugin delivery.

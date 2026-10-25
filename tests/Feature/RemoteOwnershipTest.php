@@ -23,11 +23,12 @@ it('refuses a stored ID whose remote ownership changed for update disable and re
     $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
     expect(fn () => match ($operation) {
         'update' => $reconciler->reconcile($publication, new DesiredPublication(1, 7, 'node.internal', [new DesiredResource(1, 25565, PublicationMode::Tcp, null)])),
+        'replace' => $reconciler->reconcile($publication, new DesiredPublication(1, 8, 'new-node.internal', [new DesiredResource(2, 25565, PublicationMode::Tcp, null)])),
         'disable' => $reconciler->disable($publication),
         'remove' => $reconciler->remove($publication, 1),
     })->toThrow(DomainException::class);
     expect($publication->resources()->count())->toBe(1);
-})->with(['update', 'disable', 'remove']);
+})->with(['update', 'replace', 'disable', 'remove']);
 
 it('revalidates an existing reservation against the currently approved pool', function () {
     $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'opted_in' => true]);
