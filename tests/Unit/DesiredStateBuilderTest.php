@@ -12,9 +12,9 @@ it('builds explicit overrides before Egg suggestions and ignores unknown allocat
         ],
         mapping: ['site_id' => 7, 'target_host' => '10.0.0.42', 'enabled' => true],
         allocations: [
-            ['id' => 50, 'port' => 25565],
-            ['id' => 51, 'port' => 19132],
-            ['id' => 52, 'port' => 8080],
+            ['id' => 50, 'ip' => '10.0.0.42', 'port' => 25565],
+            ['id' => 51, 'ip' => '10.0.0.43', 'port' => 19132],
+            ['id' => 52, 'ip' => '10.0.0.44', 'port' => 8080],
         ],
         profileRules: [
             0 => ['mode' => 'tcp', 'purpose' => 'game', 'allocation_port' => 25565],
@@ -28,10 +28,9 @@ it('builds explicit overrides before Egg suggestions and ignores unknown allocat
 
     expect($state->revision)->toBe(3)
         ->and($state->siteId)->toBe(7)
-        ->and($state->resources)->toHaveCount(2)
+        ->and($state->resources)->toHaveCount(1)
         ->and($state->resources[0]->mode)->toBe(PublicationMode::Https)
-        ->and($state->resources[0]->domain)->toBe('survival.games.example.com')
-        ->and($state->resources[1]->mode)->toBe(PublicationMode::Udp);
+        ->and($state->resources[0]->domain)->toBe('survival.games.example.com');
 });
 
 it('fails closed for stale revisions and incomplete HTTP configuration', function (int $expected, int $actual, array $rule, ?string $domain) {
@@ -39,9 +38,9 @@ it('fails closed for stale revisions and incomplete HTTP configuration', functio
         expectedRevision: $expected,
         server: ['uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'desired_revision' => $actual],
         mapping: ['site_id' => 7, 'target_host' => 'host.internal', 'enabled' => true],
-        allocations: [['id' => 50, 'port' => 8080]],
+        allocations: [['id' => 50, 'ip' => '10.0.0.42', 'port' => 8080]],
         profileRules: [0 => [...$rule, 'purpose' => 'game', 'allocation_port' => 8080]],
-        overrides: [],
+        overrides: [50 => [...$rule, 'purpose' => 'game']],
         defaultDomain: $domain,
     );
 })->with([

@@ -29,9 +29,7 @@ final class Infrastructure extends Page
     {
         abort_unless(self::canAccess(), 403);
         try {
-            return ['snippets' => app(InfrastructureSnippetGenerator::class)->generate(
-                (string) config('pelican-pangolin.tcp_ports'), (string) config('pelican-pangolin.udp_ports'),
-            ), 'validationError' => null];
+            return ['snippets' => app(InfrastructureSnippetGenerator::class)->current(), 'validationError' => null];
         } catch (InvalidArgumentException $exception) {
             return ['snippets' => [], 'validationError' => $exception->getMessage()];
         }

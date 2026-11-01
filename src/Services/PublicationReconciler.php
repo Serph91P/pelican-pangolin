@@ -33,7 +33,6 @@ final class PublicationReconciler
             if ($publication->desired_revision !== $desired->revision) {
                 throw new DomainException('The desired publication revision is stale.');
             }
-            app(AllocationAliasManager::class)->restore($publication);
             if (! $publication->opted_in) {
                 $this->removeLocked($publication, $desired->revision);
 
@@ -50,26 +49,27 @@ final class PublicationReconciler
                     PluginSettings::validatePublicHost($host);
                 }
                 // Release obsolete ownership before reserving exact ports; then read fresh remote inventory.
-                foreach ($publication->resources()->get() as $owned) {
-                    $retained = array_any($desired->resources, fn (DesiredResource $resource): bool => $resource->allocationId === $owned->allocation_id
-                        && ($resource->mode === $owned->mode || ($resource->mode->isHttp() && $owned->mode->isHttp())));
-                    if (! $retained) {
-                        $this->assertCurrent($publication);
-                        $this->removeResource($publication, $owned);
-                    }
-                }
-                $this->assertCurrent($publication);
                 try {
                     foreach ($desired->resources as $resource) {
                         if (! $resource->mode->isHttp()) {
                             $this->portAllocator->allocate($resource->mode->value, $resource->targetPort, []);
                         }
                     }
-                } catch (\RuntimeException $exception) {
-                    // A withdrawn pool must stop existing exposure, not merely reject the next update.
+                } catch (\RuntimeException|\InvalidArgumentException $exception) {
                     $this->disableLocked($publication);
                     throw $exception;
                 }
+                foreach ($publication->resources()->get() as $owned) {
+                    $retained = array_any($desired->resources, fn (DesiredResource $resource): bool => $resource->allocationId === $owned->allocation_id
+                        && ($resource->mode === $owned->mode || ($resource->mode->isHttp() && $owned->mode->isHttp()))
+                        && ($resource->mode->isHttp() || $owned->public_port === $resource->targetPort));
+                    if (! $retained) {
+                        $this->assertCurrent($publication);
+                        app(AllocationAliasManager::class)->restore($publication);
+                        $this->removeResource($publication, $owned);
+                    }
+                }
+                $this->assertCurrent($publication);
                 $inventory = $this->client->listResources();
                 foreach ($desired->resources as $resource) {
                     $this->assertCurrent($publication);
@@ -77,10 +77,10 @@ final class PublicationReconciler
                 }
                 $this->assertCurrent($publication);
                 ServerPublication::query()->whereKey($publication->id)->where('desired_revision', $desired->revision)->update([
-                    'status' => SyncStatus::Synced, 'last_error' => null, 'last_synced_at' => now(),
+                    'status' => $desired->resources === [] ? SyncStatus::Unselected : SyncStatus::Synced, 'last_error' => null, 'last_synced_at' => now(),
                 ]);
                 $publication->refresh();
-                if ($host !== '') {
+                if ($host !== '' && array_any($desired->resources, fn (DesiredResource $resource): bool => ! $resource->mode->isHttp())) {
                     app(AllocationAliasManager::class)->apply($publication, $host);
                 }
             } catch (Throwable $exception) {
@@ -190,14 +190,14 @@ final class PublicationReconciler
         }
         if ($owned->pangolin_target_id === null) {
             $matches = array_values(array_filter($targets, fn (array $target): bool => (int) ($target['siteId'] ?? 0) === $desired->siteId
-                && ($target['ip'] ?? null) === $desired->targetHost && (int) ($target['port'] ?? 0) === $resource->targetPort
+                && ($target['ip'] ?? null) === ($resource->targetHost ?? $desired->targetHost) && (int) ($target['port'] ?? 0) === $resource->targetPort
                 && ($target['mode'] ?? null) === ($resource->mode->isHttp() ? 'http' : $resource->mode->value)
                 && (! $resource->mode->isHttp() || ($target['method'] ?? null) === $resource->mode->value)));
             if (count($targets) > 1 || count($targets) !== count($matches)) {
                 throw new DomainException('Unexpected or ambiguous remote targets.');
             }
             $this->assertCurrent($publication);
-            $target = $matches[0] ?? $this->client->createTarget($resourceId, $desired->siteId, $desired->targetHost, $resource->targetPort, $resource->mode);
+            $target = $matches[0] ?? $this->client->createTarget($resourceId, $desired->siteId, $resource->targetHost ?? $desired->targetHost, $resource->targetPort, $resource->mode);
             $id = filter_var($target['targetId'] ?? null, FILTER_VALIDATE_INT);
             if ($id === false || $id < 1) {
                 throw new DomainException('Pangolin did not return a target ID.');
@@ -205,7 +205,7 @@ final class PublicationReconciler
             $owned->forceFill(['pangolin_target_id' => $id])->save();
         } else {
             try {
-                $this->client->updateTarget($owned->pangolin_target_id, $desired->siteId, $desired->targetHost, $resource->targetPort, $resource->mode);
+                $this->client->updateTarget($owned->pangolin_target_id, $desired->siteId, $resource->targetHost ?? $desired->targetHost, $resource->targetPort, $resource->mode);
             } catch (PangolinApiException $exception) {
                 if ($exception->status === 404) {
                     $owned->forceFill(['pangolin_target_id' => null])->save();

@@ -30,11 +30,8 @@ final class DesiredStateBuilder
             throw new DomainException('The desired publication revision is stale.');
         }
 
-        if (($mapping['enabled'] ?? false) !== true || empty($mapping['site_id']) || empty($mapping['target_host'])) {
-            throw new DomainException('An enabled and validated node mapping is required.');
-        }
-
         $resources = [];
+        $rawIdentities = [];
 
         foreach ($allocations as $position => $allocation) {
             $allocationId = filter_var($allocation['id'] ?? null, FILTER_VALIDATE_INT);
@@ -44,14 +41,6 @@ final class DesiredStateBuilder
             }
 
             $configuration = $overrides[$allocationId] ?? null;
-            if ($configuration === null) {
-                foreach ($profileRules as $rule) {
-                    if ((int) ($rule['allocation_port'] ?? 0) === $targetPort) {
-                        $configuration = $rule;
-                        break;
-                    }
-                }
-            }
 
             if ($configuration === null || ! in_array($configuration['purpose'] ?? null, ['game', 'query'], true)) {
                 continue;
@@ -67,6 +56,12 @@ final class DesiredStateBuilder
                 continue;
             }
 
+            $bindIp = (string) ($allocation['ip'] ?? '');
+            $targetHost = NodeMappingValidator::isWildcard($bindIp) ? (string) ($mapping['target_host'] ?? '') : $bindIp;
+            if (! NodeMappingValidator::validTarget($targetHost)) {
+                throw new DomainException('A concrete allocation bind IP or explicit site-reachable wildcard target is required.');
+            }
+
             $domain = null;
             if ($mode->isHttp()) {
                 $baseDomain = trim((string) ($configuration['domain'] ?? $defaultDomain ?? ''), '.');
@@ -79,19 +74,32 @@ final class DesiredStateBuilder
             }
 
             foreach ($mode === PublicationMode::Both ? [PublicationMode::Tcp, PublicationMode::Udp] : [$mode] as $protocol) {
+                if (! $protocol->isHttp()) {
+                    $identity = $protocol->value.':'.$targetPort;
+                    if (isset($rawIdentities[$identity])) {
+                        throw new DomainException('Two allocations require the same public host port/protocol; choose only one allocation. Bind IPs cannot disambiguate a public listener.');
+                    }
+                    $rawIdentities[$identity] = true;
+                }
                 $resources[] = new DesiredResource(
                     allocationId: $allocationId,
                     targetPort: $targetPort,
                     mode: $protocol,
                     domain: $domain,
+                    bindIp: $bindIp,
+                    targetHost: $targetHost,
                 );
             }
         }
 
+        if ($resources !== [] && (($mapping['enabled'] ?? false) !== true || empty($mapping['site_id']))) {
+            throw new DomainException('An enabled and validated node mapping is required.');
+        }
+
         return new DesiredPublication(
             revision: $expectedRevision,
-            siteId: (int) $mapping['site_id'],
-            targetHost: (string) $mapping['target_host'],
+            siteId: (int) ($mapping['site_id'] ?? 0),
+            targetHost: (string) ($mapping['target_host'] ?? ''),
             resources: $resources,
         );
     }

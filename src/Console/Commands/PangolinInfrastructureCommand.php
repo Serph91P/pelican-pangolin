@@ -13,10 +13,7 @@ final class PangolinInfrastructureCommand extends Command
 
     public function handle(InfrastructureSnippetGenerator $generator): int
     {
-        $snippets = $generator->generate(
-            (string) config('pelican-pangolin.tcp_ports'),
-            (string) config('pelican-pangolin.udp_ports'),
-        );
+        $snippets = $generator->current();
 
         $this->warn($snippets['warning']);
         foreach (['firewall', 'compose', 'traefik', 'pangolin'] as $section) {

@@ -71,7 +71,7 @@ it('refreshes affected publications after node mapping and Egg profile changes',
     $service->refreshNode(42);
     $service->refreshEgg('e2ed07f0-7f4f-4fa4-9c90-56b0c0998a70');
 
-    expect($publication->fresh()->desired_revision)->toBe(3)
+    expect($publication->fresh()->desired_revision)->toBe(2)
         ->and($publication->fresh()->desired_state['mapping']['enabled'])->toBeTrue();
     Queue::assertPushed(ReconcileServerPublication::class, 2);
 

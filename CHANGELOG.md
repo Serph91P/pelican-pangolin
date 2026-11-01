@@ -2,6 +2,10 @@
 
 ## 1.1.0 - Unreleased
 
+- Remove global TCP/UDP pools and ignore old pool keys. Derive publication and infrastructure from current, explicitly approved allocation IDs/protocols; retire the fixed-port Egg editor without dropping legacy tables.
+- Preserve actual bind IPs and follow same-ID IP/port changes; use an explicit site-reachable mapping for wildcard binds, and require reapproval after allocation replacement/node transfer.
+- Add inline Org-ID/least-privilege help, site inventory selection, HTTP-only advanced configuration, truthful read-check messages and visible cleanup tombstones/retry.
+- Distinguish no selection, configuration blockage, actual suspension and API sync. Keep retained remote rows in infrastructure guidance until cleanup is confirmed.
 - Pin development and native plugin integration to Pelican `1.0.0-rc.2`, PHP 8.4/8.5.
 - Require explicit public host, exact allocation ports, and explicit game/query purpose; expand TCP+UDP approval into separate resources.
 - Preserve manual aliases and restore only unchanged plugin aliases; display API-synchronized endpoints without claiming external reachability.

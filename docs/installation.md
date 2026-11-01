@@ -4,22 +4,30 @@
 2. Run Pelican's plugin discovery and installation commands from the Panel root.
 3. Start or restart a queue worker and keep Pelican's scheduler running. Reconciliation is queued after database commits, and the scheduler refreshes opted-in desired state every five minutes to recover bulk allocation or configuration changes.
 4. Open the Pelican Pangolin plugin settings in the administrator panel.
-5. Configure an HTTPS Pangolin API URL, organization ID, Integration API token, default domain, TCP pool, UDP pool, and bounded timeouts.
+5. Configure an HTTPS Pangolin API URL, organization ID, org-scoped Integration API token and bounded timeouts. Configure a public game host for raw publication; the advanced default domain is only for explicit HTTP use. There are no pool fields.
 6. Run `php artisan pangolin:preflight` before creating node mappings.
 
-The token field always displays blank. Leaving it blank retains the existing value. Settings are validated with read-only inventory requests before being written. Saving settings restarts Pelican queue workers so subsequent reconciliation uses the new endpoint, token, and port pools.
+The token field always displays blank. Leaving it blank retains the existing value. Saving checks `listSites` and `listResources`; it checks `listOrgDomains` only when an HTTP default domain is supplied. Read success does not prove write permission, infrastructure application or external reachability. No probe resource is created. Saving settings restarts Pelican queue workers so subsequent reconciliation uses the new endpoint/token. Select a site in each node mapping; its numeric ID and nice ID are stored together, then read-validated.
 
-## Upgrade to 1.1.0
+## Upgrade to allocation-based publication
 
-Back up the Pelican database and plugin files. Target Pelican `1.0.0-rc.2` and PHP 8.4/8.5; older targets are not verified. Opt out existing publications and complete remote cleanup before replacing a remapped-port setup. Run the native plugin upgrade flow and restart queue workers.
+Back up the database, plugin files/metadata and current configuration. Replace only this plugin through Pelican's native upgrade flow; restart workers and run `php artisan pangolin:reconcile` (or allow the five-minute refresh). This change adds no migration and does not drop tables or remote IDs. The existing MariaDB install/retry contract below remains unchanged.
 
-Configure `PANGOLIN_PUBLIC_HOST` explicitly. Existing positional Egg rules and overrides without `purpose` do NOT become approved automatically. Review each rule, supply its exact `allocation_port` and `game`/`query` purpose, then re-approve the desired allocations/protocols. `allocation_position` remains a unique rule identifier for schema compatibility; it no longer selects an allocation by list position. Legacy remapped rows intentionally fail with a cleanup/reapproval instruction, rather than displaying the wrong endpoint.
+`PANGOLIN_TCP_PORTS` and `PANGOLIN_UDP_PORTS` are ignored, even if still present in the environment. They are not hidden allowlists. Do not delete production environment files to upgrade. Global fixed-port Egg profiles remain visible as legacy read-only metadata and no longer grant exposure. A legacy-reapproval warning appears on affected publications. Existing explicit Game/Query approvals keyed by a still-assigned allocation ID survive; profile-only/unknown approvals are cleaned up, never silently retained or widened. Review each server and explicitly approve its current IDs. Ownership IDs remain until confirmed cleanup; errors require retry, not table deletion.
+
+Snapshots now include bind IPs. Same-ID changes on the same server use the current IP/port; new/replacement IDs and node transfers require new approval. A rename/no-op does not advance the desired revision or clear an alias. Concrete bind IPs are targets; wildcard binds require the explicit node mapping target. Existing remapped resources are removed before publishing the correct exact port. Conflicts fail visibly, never remap.
+
+States distinguish `unselected`, configuration `blocked`, actual suspension (`suspended` flag and disabled API resources), pending sync, API `synced`, and removal/error. `synced` is not a reachability claim. Deleted-server cleanup rows remain visible to root admins, with error and retry; scoped admins cannot access orphaned ownership. Do not remove infrastructure while retained remote rows still need cleanup.
+
+## Earlier 1.1.0 upgrade (historical context)
+
+The earlier release introduced safe ownership and exact-port publication on Pelican `1.0.0-rc.2`/PHP 8.4/8.5. Its exact-port Egg editor is now retired; do not follow old profile-editing instructions. Use the allocation-based upgrade above. Native aliases and existing ownership records still follow the same preservation rules.
 
 Legacy stored remote IDs are checked against their original deterministic resource name; new records use a durable random ownership name. A mismatched name or unexpected target requires operator investigation: do not edit IDs or rename foreign resources just to make sync pass. Manual aliases are preserved; use the confirmed endpoint column when an existing alias intentionally differs.
 
 ## Rollback
 
-Opt out all publications, run the queue until resource cleanup completes, and verify no managed ownership rows remain before reverting plugin files/schema using Pelican's native flow. The new down migration refuses to discard active ownership rows. Do not force-drop tables. Only unchanged plugin-owned aliases are cleared; manual edits remain. Restoring a database backup also restores IDs and requires comparing remote state before enabling workers. Infrastructure rollback is a separate reviewed Git/Dockhand handoff, described in [raw port pools](raw-port-pool.md).
+Opt out all publications, run the queue until resource cleanup completes, and verify no managed ownership rows remain before reverting plugin files/schema using Pelican's native flow. The down migration refuses to discard active ownership rows. Do not force-drop tables. Only unchanged plugin-owned aliases are cleared; manual edits remain. Old binaries do not understand the new states or bind-aware snapshots: do not enable old workers against these rows. Restore a matching pre-upgrade database/config backup only after comparing remote ownership, with workers paused until consistent. Restoring a database backup also restores IDs; never discard still-active ownership. Infrastructure rollback is a separate reviewed Git/Dockhand handoff, described in [allocation infrastructure](raw-port-pool.md).
 
 ## Uninstall
 
@@ -64,6 +72,6 @@ The harness reproduces the original 1059 DDL failure, seeds 001/002 in **batch 8
 
 - A pending status usually means no queue worker is running.
 - A permission error identifies the inventory or mutation that the Integration API key cannot perform.
-- A missing mapping, unknown Egg rule, invalid method, exhausted pool, or ambiguous domain fails closed.
+- A missing mapping, invalid method, protected/conflicting exact port, or ambiguous HTTP domain fails closed. No selection is not an API-ready publication.
 - A remote 404 is treated as drift and recreated only from an existing plugin-owned record.
 - Use `php artisan pangolin:reconcile SERVER_ID` after correcting configuration.

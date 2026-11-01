@@ -27,7 +27,7 @@ it('serializes reconciliation per server and ignores stale revisions', function 
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldNotReceive('createRawResource', 'createHttpResource', 'updateResource', 'deleteResource');
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
     $job = new ReconcileServerPublication($publication->id, $publication->server_id, 3);
 
     expect($job)->not->toBeInstanceOf(ShouldBeUnique::class)
@@ -35,7 +35,8 @@ it('serializes reconciliation per server and ignores stale revisions', function 
         ->and($job->afterCommit)->toBeTrue()
         ->and($job->backoff())->toBe([10, 30, 90, 180]);
 
-    $job->handle($reconciler, new DesiredStateBuilder);
+    $this->app->instance(PublicationReconciler::class, $reconciler);
+    $job->handle(new DesiredStateBuilder);
     expect($publication->fresh()->desired_revision)->toBe(4);
 });
 
@@ -59,10 +60,11 @@ it('disables a suspended publication before building unavailable desired state',
         $mock->shouldReceive('updateResource')->once()->with(101, ['enabled' => false])->andReturn(['resourceId' => 101]);
         $mock->shouldReceive('getResource')->once()->with(101)->andReturn(['resourceId' => 101, 'name' => 'pelican-10b8c7c9ee30-60']);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('27015', '27015'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
+    $this->app->instance(PublicationReconciler::class, $reconciler);
 
     (new ReconcileServerPublication($publication->id, $publication->server_id, 2))
-        ->handle($reconciler, new DesiredStateBuilder);
+        ->handle(new DesiredStateBuilder);
 
     expect($publication->fresh()->status->value)->toBe('disabled');
 });
@@ -96,9 +98,10 @@ it('ignores a stale removal after the publication is opted in again', function (
     $client = Mockery::mock(PangolinClient::class, function (MockInterface $mock) {
         $mock->shouldNotReceive('deleteResource');
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
-    (new RemoveServerPublication($publication->id, $publication->server_id, 1))->handle($reconciler);
+    $this->app->instance(PublicationReconciler::class, $reconciler);
+    (new RemoveServerPublication($publication->id, $publication->server_id, 1))->handle();
 
     expect($publication->fresh()->opted_in)->toBeTrue()
         ->and($publication->fresh()->resources)->toHaveCount(1);
@@ -130,9 +133,10 @@ it('ignores an in-flight removal generation after re-opt-in', function () {
             ])->save();
         });
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
-    (new RemoveServerPublication($publication->id, $publication->server_id, 5))->handle($reconciler);
+    $this->app->instance(PublicationReconciler::class, $reconciler);
+    (new RemoveServerPublication($publication->id, $publication->server_id, 5))->handle();
 
     expect($publication->fresh()->opted_in)->toBeTrue()
         ->and($publication->fresh()->desired_revision)->toBe(6);
@@ -152,4 +156,14 @@ it('requeues durable pending removals during scheduled refresh', function () {
 
     Queue::assertPushed(RemoveServerPublication::class, fn (RemoveServerPublication $job): bool => $job->publicationId === $publication->id
         && $job->revision === 7);
+});
+
+it('reports cleanup connection configuration failures immediately and retains ownership for retry', function () {
+    $publication = ServerPublication::create(['server_id' => 99, 'server_uuid' => '3500d9f1-8ff1-4057-95e2-9e78145457ec', 'opted_in' => false, 'deletion_pending' => true, 'status' => 'removing']);
+    $publication->resources()->create(['allocation_id' => 70, 'mode' => 'tcp', 'public_port' => 30000, 'pangolin_resource_id' => 91, 'pangolin_target_id' => 92]);
+    $this->app->bind(PublicationReconciler::class, fn () => throw new InvalidArgumentException('Invalid API connection configuration'));
+    $job = new RemoveServerPublication($publication->id, 99, 1);
+    expect(fn () => $this->app->call([$job, 'handle']))->toThrow(InvalidArgumentException::class);
+    expect($publication->fresh()->status->value)->toBe('error')->and($publication->fresh()->deletion_pending)->toBeTrue()
+        ->and($publication->fresh()->last_error)->toContain('remote exposure may remain')->and($publication->resources()->firstOrFail()->pangolin_resource_id)->toBe(91);
 });

@@ -10,4 +10,6 @@ enum SyncStatus: string
     case Error = 'error';
     case Drift = 'drift';
     case Removing = 'removing';
+    case Unselected = 'unselected';
+    case Blocked = 'blocked';
 }

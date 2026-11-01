@@ -95,7 +95,7 @@ it('runs the native admin action through the database queue to confirmed raw end
         ->and(array_intersect($oldTargets, array_keys($api->targets)))->toBe([])
         ->and(array_column($api->resources, 'proxyPort'))->toBe([25565, 25565])
         ->and(array_column($api->targets, 'siteId'))->toBe([8, 8])
-        ->and(array_column($api->targets, 'ip'))->toBe(['new-node.internal', 'new-node.internal'])
+        ->and(array_column($api->targets, 'ip'))->toBe(['10.0.0.43', '10.0.0.43'])
         ->and(array_column($api->targets, 'port'))->toBe([25565, 25565])
         ->and($replacement->fresh()->address)->toBe('games.example.com:25565')
         ->and($replacement->fresh()->ip)->toBe('10.0.0.43');

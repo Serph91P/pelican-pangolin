@@ -5,8 +5,9 @@ use Symfony\Component\Yaml\Yaml;
 
 it('generates deterministic parseable bounded blocks and provider-neutral guidance', function () {
     $generator = new InfrastructureSnippetGenerator;
-    $blocks = $generator->generate('30002,30000-30001', '30000');
-    expect($blocks)->toBe($generator->generate('30000-30002', '30000'));
+    $pairs = [['protocol' => 'tcp', 'port' => 30002], ['protocol' => 'tcp', 'port' => 30000], ['protocol' => 'tcp', 'port' => 30001], ['protocol' => 'udp', 'port' => 30000]];
+    $blocks = $generator->generate($pairs);
+    expect($blocks)->toBe($generator->generate(array_reverse($pairs)));
     expect(Yaml::parse($blocks['traefik']))->toBe(['entryPoints' => [
         'tcp-30000' => ['address' => ':30000/tcp'], 'tcp-30001' => ['address' => ':30001/tcp'],
         'tcp-30002' => ['address' => ':30002/tcp'], 'udp-30000' => ['address' => ':30000/udp'],

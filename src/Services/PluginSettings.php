@@ -12,6 +12,7 @@ final class PluginSettings
     public function formData(array $configured): array
     {
         $configured['token'] = '';
+        unset($configured['tcp_ports'], $configured['udp_ports']);
 
         return $configured;
     }
@@ -19,7 +20,9 @@ final class PluginSettings
     /** @param array<string, mixed> $data */
     public function validate(array $data): void
     {
-        self::validatePublicHost((string) ($data['public_host'] ?? ''));
+        if (trim((string) ($data['public_host'] ?? '')) !== '') {
+            self::validatePublicHost((string) $data['public_host']);
+        }
         $parts = parse_url((string) ($data['api_url'] ?? ''));
         if (! is_array($parts)
             || ($parts['scheme'] ?? null) !== 'https'
@@ -34,8 +37,6 @@ final class PluginSettings
         if (trim((string) ($data['organization_id'] ?? '')) === '' || trim((string) ($data['token'] ?? '')) === '') {
             throw new InvalidArgumentException('Pangolin organization ID and API token are required.');
         }
-
-        PublicPortAllocator::from((string) ($data['tcp_ports'] ?? ''), (string) ($data['udp_ports'] ?? ''));
 
         foreach (['connect_timeout', 'timeout'] as $field) {
             if (isset($data[$field]) && ((int) $data[$field] < 1 || (int) $data[$field] > 60)) {
@@ -57,8 +58,7 @@ final class PluginSettings
             'PANGOLIN_API_TOKEN' => $token === '' ? $existingToken : $token,
             'PANGOLIN_DEFAULT_DOMAIN' => (string) ($data['default_domain'] ?? ''),
             'PANGOLIN_PUBLIC_HOST' => (string) ($data['public_host'] ?? ''),
-            'PANGOLIN_TCP_PORTS' => (string) $data['tcp_ports'],
-            'PANGOLIN_UDP_PORTS' => (string) $data['udp_ports'],
+
             'PANGOLIN_CONNECT_TIMEOUT' => (int) ($data['connect_timeout'] ?? 3),
             'PANGOLIN_TIMEOUT' => (int) ($data['timeout'] ?? 10),
         ];

@@ -27,12 +27,13 @@ Pelican Pangolin is an administrator-only Pelican Panel plugin that publishes ex
 
 1. Follow [installation](docs/installation.md).
 2. Create a least-privilege key using [Pangolin API key](docs/pangolin-api-key.md).
-3. Configure the HTTPS API endpoint, organization, token, explicit public game host (`PANGOLIN_PUBLIC_HOST`), domains, and raw port pools in the plugin settings.
+3. Configure the HTTPS API endpoint, organization and org-scoped token in plugin settings. The form explains where to find the Org ID and lists the required actions. Set an explicit public game host (`PANGOLIN_PUBLIC_HOST`) for raw publication. HTTP domain settings are optional/advanced.
 4. Run `php artisan pangolin:preflight`.
-5. Map each Pelican node to one Pangolin site and reachable target host.
-6. Optionally create Egg profiles, then use the Pangolin publication action on a server.
+5. Select an existing Pangolin site for each Pelican node. Set a site-reachable target for wildcard bind addresses; concrete allocation bind IPs are used directly.
+6. Open the Pangolin publication action on an existing server. Review every current allocation (ID, bind IP, port), opt in and explicitly approve Game/Query plus TCP/UDP/Both per allocation. Unknown/new allocations stay unpublished. HTTP/HTTPS requires an explicitly selected HTTP mode and domain.
+7. Process the queue, inspect API sync, and copy the derived infrastructure requirements for separate operator application. No port pools or automatic ranges are used.
 
-See [raw port pools](docs/raw-port-pool.md) before enabling TCP or UDP publication.
+See [allocation publication and infrastructure](docs/raw-port-pool.md) before enabling TCP or UDP publication. Old pool environment keys are ignored; legacy fixed-port Egg profiles are read-only and inert. Review the [upgrade instructions](docs/installation.md).
 
 ## Commands
 

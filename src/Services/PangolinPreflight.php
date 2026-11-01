@@ -15,7 +15,7 @@ final readonly class PangolinPreflight
         $issues = [];
         $warnings = [];
         $sites = $this->inventory('sites', fn (): array => $this->client->listSites(), $issues);
-        $domains = $this->inventory('domains', fn (): array => $this->client->listDomains(), $issues);
+        $domains = $domain === null ? [] : $this->inventory('domains', fn (): array => $this->client->listDomains(), $issues);
         $resources = $this->inventory('resources', fn (): array => $this->client->listResources(), $issues);
 
         if ($site !== null && ! collect($sites)->contains(fn (array $candidate): bool => (string) ($candidate['siteId'] ?? '') === $site
@@ -31,6 +31,8 @@ final readonly class PangolinPreflight
         if (! collect($resources)->contains(fn (array $resource): bool => in_array($resource['mode'] ?? null, ['tcp', 'udp'], true))) {
             $warnings[] = 'Raw resource support cannot be confirmed non-destructively because no raw resource exists.';
         }
+
+        $warnings[] = 'Read checks only: write permissions, infrastructure application and external reachability are not verified. No probe resources were created.';
 
         return compact('issues', 'warnings');
     }

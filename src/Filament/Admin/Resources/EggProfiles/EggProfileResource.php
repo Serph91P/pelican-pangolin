@@ -2,34 +2,22 @@
 
 namespace PelicanDev\PelicanPangolin\Filament\Admin\Resources\EggProfiles;
 
-use App\Models\Egg;
 use App\Models\User;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use PelicanDev\PelicanPangolin\Enums\PublicationMode;
-use PelicanDev\PelicanPangolin\Filament\Admin\Resources\EggProfiles\Pages\CreateEggProfile;
-use PelicanDev\PelicanPangolin\Filament\Admin\Resources\EggProfiles\Pages\EditEggProfile;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\EggProfiles\Pages\ListEggProfiles;
 use PelicanDev\PelicanPangolin\Models\EggProfile;
 
+/** Legacy metadata is retained for rollback, never evaluated as allocation approval. */
 final class EggProfileResource extends Resource
 {
     protected static ?string $model = EggProfile::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'tabler-egg';
 
-    protected static ?string $navigationLabel = 'Pangolin Egg profiles';
+    protected static ?string $navigationLabel = 'Pangolin legacy profiles (inert)';
 
     public static function canViewAny(): bool
     {
@@ -38,17 +26,17 @@ final class EggProfileResource extends Resource
 
     public static function canCreate(): bool
     {
-        return self::canManageGlobalConfiguration(user());
+        return false;
     }
 
     public static function canEdit(Model $record): bool
     {
-        return self::canManageGlobalConfiguration(user());
+        return false;
     }
 
     public static function canDelete(Model $record): bool
     {
-        return self::canManageGlobalConfiguration(user());
+        return false;
     }
 
     public static function canManageGlobalConfiguration(?User $user): bool
@@ -56,45 +44,18 @@ final class EggProfileResource extends Resource
         return $user?->isRootAdmin() ?? false;
     }
 
-    public static function form(Schema $schema): Schema
-    {
-        return $schema->components([
-            Select::make('egg_uuid')
-                ->label('Pelican Egg')
-                ->options(fn () => Egg::query()->whereNotNull('uuid')->pluck('name', 'uuid'))
-                ->searchable()->required()->unique(ignoreRecord: true),
-            TextInput::make('name')->required()->maxLength(255),
-            Toggle::make('enabled')->default(true),
-            Repeater::make('rules')->relationship()->schema([
-                TextInput::make('allocation_position')->integer()->minValue(0)->required(),
-                TextInput::make('allocation_port')->label('Exact approved allocation port')->integer()->minValue(1024)->maxValue(65535)->required(),
-                Select::make('purpose')->options(['game' => 'Game', 'query' => 'Query', 'ignored' => 'Do not publish'])->required(),
-                Select::make('mode')->options(collect(PublicationMode::cases())->mapWithKeys(fn (PublicationMode $mode): array => [$mode->value => ucfirst($mode->value)]))->required()->live(),
-                TextInput::make('domain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),
-                TextInput::make('subdomain')->visible(fn (Get $get): bool => in_array($get('mode'), ['http', 'https'], true)),
-            ])->columns(4)->columnSpanFull()->reorderable(false),
-        ]);
-    }
-
     public static function table(Table $table): Table
     {
         return $table->columns([
             TextColumn::make('name')->searchable(),
             TextColumn::make('egg_uuid')->label('Egg UUID')->copyable(),
-            TextColumn::make('rules_count')->counts('rules')->label('Rules'),
-            IconColumn::make('enabled')->boolean(),
-        ])->recordActions([
-            EditAction::make(),
-            DeleteAction::make(),
+            TextColumn::make('rules_count')->counts('rules')->label('Retained rules (inert)'),
+            TextColumn::make('reapproval')->state('Retired: approve actual allocations in the server action. Profile-only resources are cleaned up on reconciliation.')->wrap(),
         ]);
     }
 
     public static function getPages(): array
     {
-        return [
-            'index' => ListEggProfiles::route('/'),
-            'create' => CreateEggProfile::route('/create'),
-            'edit' => EditEggProfile::route('/{record}/edit'),
-        ];
+        return ['index' => ListEggProfiles::route('/')];
     }
 }

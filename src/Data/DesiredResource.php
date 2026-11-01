@@ -11,6 +11,8 @@ final readonly class DesiredResource
         public int $targetPort,
         public PublicationMode $mode,
         public ?string $domain,
+        public ?string $bindIp = null,
+        public ?string $targetHost = null,
     ) {}
 
     public function targetMethod(): ?string
