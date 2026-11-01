@@ -2,12 +2,14 @@
 
 namespace PelicanDev\PelicanPangolin\Jobs;
 
+use DomainException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use InvalidArgumentException;
 use PelicanDev\PelicanPangolin\Enums\SyncStatus;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
 use PelicanDev\PelicanPangolin\Services\DesiredStateBuilder;
@@ -50,45 +52,55 @@ final class ReconcileServerPublication implements ShouldQueue
         return [(new WithoutOverlapping($this->uniqueId()))->shared()->releaseAfter(15)->expireAfter(300)];
     }
 
-    public function handle(PublicationReconciler $reconciler, DesiredStateBuilder $builder): void
+    public function handle(DesiredStateBuilder $builder): void
     {
         $publication = ServerPublication::query()->find($this->publicationId);
         if ($publication === null || ! $publication->opted_in || $publication->desired_revision !== $this->revision) {
             return;
         }
+        try {
+            // Resolve inside the failure boundary: empty/invalid connection settings must be visible.
+            $reconciler = app(PublicationReconciler::class);
+            if ($publication->suspended) {
+                $reconciler->disable($publication);
 
-        if ($publication->suspended) {
-            $reconciler->disable($publication);
-
-            return;
+                return;
+            }
+            $state = $publication->desired_state;
+            $desired = $builder->build(
+                expectedRevision: $this->revision,
+                server: ['uuid' => $publication->server_uuid, 'desired_revision' => $publication->desired_revision],
+                mapping: is_array($state['mapping'] ?? null) ? $state['mapping'] : [],
+                allocations: is_array($state['allocations'] ?? null) ? $state['allocations'] : [],
+                profileRules: [],
+                overrides: is_array($state['overrides'] ?? null) ? $state['overrides'] : [],
+                defaultDomain: is_string($state['default_domain'] ?? null) ? $state['default_domain'] : null,
+            );
+            $reconciler->reconcile($publication, $desired);
+        } catch (DomainException|InvalidArgumentException $exception) {
+            if (isset($reconciler)) {
+                try {
+                    $reconciler->disable($publication);
+                } catch (Throwable $cleanupFailure) {
+                    $this->failed($cleanupFailure);
+                    throw $cleanupFailure;
+                }
+            }
+            ServerPublication::query()->whereKey($publication->id)->where('desired_revision', $this->revision)->update([
+                'status' => SyncStatus::Blocked, 'last_error' => $this->sanitizeError($exception->getMessage()),
+            ]);
+        } catch (Throwable $exception) {
+            $this->failed($exception);
+            throw $exception;
         }
-
-        $state = $publication->desired_state;
-        $desired = $builder->build(
-            expectedRevision: $this->revision,
-            server: [
-                'uuid' => $publication->server_uuid,
-                'desired_revision' => $publication->desired_revision,
-            ],
-            mapping: is_array($state['mapping'] ?? null) ? $state['mapping'] : [],
-            allocations: is_array($state['allocations'] ?? null) ? $state['allocations'] : [],
-            profileRules: is_array($state['profile_rules'] ?? null) ? $state['profile_rules'] : [],
-            overrides: is_array($state['overrides'] ?? null) ? $state['overrides'] : [],
-            defaultDomain: is_string($state['default_domain'] ?? null) ? $state['default_domain'] : null,
-        );
-
-        $reconciler->reconcile($publication, $desired);
     }
 
     public function failed(?Throwable $exception): void
     {
-        if ($exception === null) {
-            return;
+        if ($exception !== null) {
+            ServerPublication::query()->whereKey($this->publicationId)->where('desired_revision', $this->revision)->update([
+                'status' => SyncStatus::Error->value, 'last_error' => $this->sanitizeError($exception->getMessage()),
+            ]);
         }
-
-        ServerPublication::query()->whereKey($this->publicationId)->where('desired_revision', $this->revision)->update([
-            'status' => SyncStatus::Error->value,
-            'last_error' => $this->sanitizeError($exception->getMessage()),
-        ]);
     }
 }

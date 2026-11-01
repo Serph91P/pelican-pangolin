@@ -6,62 +6,51 @@ use App\Enums\ServerState;
 use App\Models\Server;
 use Illuminate\Support\Facades\DB;
 use PelicanDev\PelicanPangolin\Enums\SyncStatus;
-use PelicanDev\PelicanPangolin\Models\EggProfile;
 use PelicanDev\PelicanPangolin\Models\NodeMapping;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
 
 final class PublicationStateSnapshot
 {
-    public function refresh(Server $server, ServerPublication $publication): void
+    /** @param array<int, array<string, mixed>>|null $approvals */
+    public function refresh(Server $server, ServerPublication $publication, ?array $approvals = null): void
     {
-        DB::transaction(function () use ($server, $publication): void {
+        DB::transaction(function () use ($server, $publication, $approvals): void {
             ServerPublication::query()->whereKey($publication->id)->lockForUpdate()->firstOrFail();
             $publication->refresh();
             if (! $publication->opted_in) {
                 return;
             }
-            app(AllocationAliasManager::class)->restore($publication);
             $mapping = NodeMapping::query()->where('node_id', $server->node_id)->first();
-            $profile = EggProfile::query()
-                ->with('rules')
-                ->where('egg_uuid', $server->egg->uuid)
-                ->where('enabled', true)
-                ->first();
-            $allocations = $server->allocations
-                ->sortBy(fn ($allocation): string => ($allocation->id === $server->allocation_id ? '0-' : '1-').str_pad((string) $allocation->id, 20, '0', STR_PAD_LEFT))
-                ->values()
-                ->map(fn ($allocation): array => ['id' => $allocation->id, 'port' => $allocation->port])
-                ->all();
-            $state = $publication->desired_state;
-            $mappingReady = $mapping !== null
-                && $mapping->enabled
-                && $mapping->validated_at !== null
-                && $mapping->validation_error === null;
-
+            $allocations = $server->allocations->sortBy('id')->values()
+                ->map(fn ($allocation): array => ['id' => $allocation->id, 'ip' => $allocation->ip, 'port' => $allocation->port])->all();
+            $previous = $publication->desired_state;
+            $overrides = $approvals ?? (is_array($previous['overrides'] ?? null) ? $previous['overrides'] : []);
+            // Legacy explicit per-ID approvals survive; a node transfer always needs fresh approval.
+            if ($approvals === null && isset($previous['node_id']) && $previous['node_id'] !== $server->node_id) {
+                $overrides = [];
+            }
+            $overrides = array_intersect_key($overrides, array_flip(array_column($allocations, 'id')));
+            ksort($overrides);
+            $mappingReady = $mapping !== null && $mapping->enabled && $mapping->validated_at !== null && $mapping->validation_error === null;
+            $state = [
+                'node_id' => $server->node_id,
+                'mapping' => $mapping === null ? [] : ['site_id' => $mapping->site_id, 'target_host' => $mapping->target_host, 'enabled' => $mappingReady],
+                'allocations' => $allocations,
+                'overrides' => $overrides,
+                'default_domain' => config('pelican-pangolin.default_domain'),
+                'public_host' => config('pelican-pangolin.public_host'),
+                'legacy_reapproval' => $approvals === null && (! empty($previous['profile_rules']) || ! empty($previous['legacy_reapproval'])),
+            ];
+            $suspended = $server->status === ServerState::Suspended;
+            if ($previous === $state && $publication->suspended === $suspended) {
+                return;
+            }
+            app(AllocationAliasManager::class)->restore($publication);
             $publication->forceFill([
                 'status' => SyncStatus::Pending,
                 'desired_revision' => $publication->desired_revision + 1,
-                'suspended' => $server->status === ServerState::Suspended || ! $mappingReady,
-                'desired_state' => [
-                    'mapping' => $mapping === null ? [] : [
-                        'site_id' => $mapping->site_id,
-                        'target_host' => $mapping->target_host,
-                        'enabled' => $mappingReady,
-                    ],
-                    'allocations' => $allocations,
-                    'profile_rules' => $profile?->rules->mapWithKeys(fn ($rule): array => [
-                        $rule->allocation_position => array_filter([
-                            'mode' => $rule->mode->value,
-                            'purpose' => $rule->purpose,
-                            'allocation_port' => $rule->allocation_port,
-                            'domain' => $rule->domain,
-                            'subdomain' => $rule->subdomain,
-                        ], fn (mixed $value): bool => $value !== null),
-                    ])->all() ?? [],
-                    'overrides' => is_array($state['overrides'] ?? null) ? $state['overrides'] : [],
-                    'default_domain' => config('pelican-pangolin.default_domain'),
-                    'public_host' => config('pelican-pangolin.public_host'),
-                ],
+                'suspended' => $suspended,
+                'desired_state' => $state,
             ])->save();
         });
     }

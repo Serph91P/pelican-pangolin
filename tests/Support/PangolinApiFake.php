@@ -35,6 +35,9 @@ final class PangolinApiFake
             } elseif ($method === 'PUT' && str_ends_with($path, '/public-resource')) {
                 $id = ++$this->id;
                 $data = $this->resources[$id] = [...$body, 'resourceId' => $id, 'enabled' => false];
+                if (($body['mode'] ?? '') === 'http') {
+                    $data = $this->resources[$id] = [...$data, 'fullDomain' => empty($body['subdomain']) ? 'example.com' : $body['subdomain'].'.example.com'];
+                }
             } elseif (preg_match('~/public-resource/(\d+)/targets$~', $path, $matches) && $method === 'GET') {
                 $items = array_values(array_filter($this->targets, fn ($target) => $target['resourceId'] === (int) $matches[1]));
                 $data = ['targets' => $items, 'pagination' => ['total' => count($items)]];

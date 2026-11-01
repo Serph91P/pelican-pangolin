@@ -9,7 +9,7 @@ final class AllocationObserver
 {
     public function updated(Allocation $allocation): void
     {
-        if (! $allocation->wasChanged(['port', 'server_id', 'node_id'])) {
+        if (! $allocation->wasChanged(['ip', 'port', 'server_id', 'node_id'])) {
             return;
         }
 

@@ -43,10 +43,7 @@ final class PelicanPangolinServiceProvider extends ServiceProvider
             (int) config('pelican-pangolin.connect_timeout', 3),
             (int) config('pelican-pangolin.timeout', 10),
         ));
-        $this->app->singleton(PublicPortAllocator::class, fn (): PublicPortAllocator => PublicPortAllocator::from(
-            (string) config('pelican-pangolin.tcp_ports'),
-            (string) config('pelican-pangolin.udp_ports'),
-        ));
+        $this->app->singleton(PublicPortAllocator::class);
         $this->app->singleton(ResourceNaming::class);
         $this->app->singleton(PublicationReconciler::class);
 

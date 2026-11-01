@@ -25,7 +25,7 @@ it('does not mark a superseded API operation synced or overwrite its newer statu
         return ['resourceId' => 91];
     });
     $client->shouldNotReceive('createTarget');
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
     expect(fn () => $reconciler->reconcile($publication, new DesiredPublication(1, 7, 'node.internal', [new DesiredResource(1, 25565, PublicationMode::Tcp, null)])))->toThrow(DomainException::class, 'stale');
     expect($publication->fresh()->status->value)->toBe('removing')
         ->and($publication->resources()->firstOrFail()->pangolin_resource_id)->toBe(91)
@@ -44,7 +44,7 @@ it('stops obsolete allocation deletion when the revision changes during ownershi
         return [['targetId' => 92]];
     });
     $client->shouldNotReceive('deleteResource');
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
     expect(fn () => $reconciler->reconcile($publication, new DesiredPublication(1, 8, 'new-node.internal', [])))->toThrow(DomainException::class, 'stale');
     expect($publication->fresh()->status->value)->toBe('pending')
         ->and($publication->resources()->count())->toBe(1);
@@ -62,7 +62,7 @@ it('serializes remote inventory across different servers', function () {
     $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'opted_in' => true]);
     $client = Mockery::mock(PangolinClient::class);
     $client->shouldNotReceive('listResources');
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
     try {
         expect(fn () => $reconciler->reconcile($publication, new DesiredPublication(1, 7, 'node.internal', [])))->toThrow(LockTimeoutException::class);
     } finally {

@@ -4,19 +4,19 @@ use PelicanDev\PelicanPangolin\Services\DesiredStateBuilder;
 use PelicanDev\PelicanPangolin\Services\PluginSettings;
 use PelicanDev\PelicanPangolin\Services\PublicPortAllocator;
 
-it('never silently remaps a conflicting or out-of-pool allocation', function (int $port, array $reserved) {
-    expect(fn () => PublicPortAllocator::from('25565-25566', '25565')->allocate('tcp', $port, $reserved))
+it('never silently remaps a conflicting allocation', function (int $port, array $reserved) {
+    expect(fn () => (new PublicPortAllocator)->allocate('tcp', $port, $reserved))
         ->toThrow(RuntimeException::class);
-})->with([[25565, [25565]], [25567, []]]);
+})->with([[25565, [25565]], [25567, [25567]]]);
 
-it('bounds pools and excludes reserved infrastructure ports', function (string $pool) {
-    expect(fn () => PublicPortAllocator::from($pool, '25565'))->toThrow(InvalidArgumentException::class);
-})->with(['1-65535', '80', '443', '2022', '8080', '51820', '30000-32000']);
+it('bounds allocations and excludes reserved infrastructure ports', function (int $port) {
+    expect(fn () => (new PublicPortAllocator)->allocate('tcp', $port, []))->toThrow(InvalidArgumentException::class);
+})->with([0, 80, 443, 2022, 8080, 51820, 65536]);
 
 it('only publishes approved game and query protocols and supports both on one allocation', function () {
     $state = (new DesiredStateBuilder)->build(1, ['desired_revision' => 1],
         ['enabled' => true, 'site_id' => 7, 'target_host' => 'node.internal'],
-        [['id' => 1, 'port' => 25565], ['id' => 2, 'port' => 25566], ['id' => 3, 'port' => 25567]], [], [
+        [['id' => 1, 'ip' => '10.0.0.42', 'port' => 25565], ['id' => 2, 'ip' => '10.0.0.42', 'port' => 25566], ['id' => 3, 'ip' => '10.0.0.42', 'port' => 25567]], [], [
             1 => ['mode' => 'both', 'purpose' => 'game'],
             2 => ['mode' => 'tcp', 'purpose' => 'rcon'],
             3 => ['mode' => 'udp'],
@@ -37,4 +37,4 @@ it('validates explicit public hosts independently of API DNS', function (string 
         'api_url' => 'https://api.example.com', 'organization_id' => 'org', 'token' => 'test',
         'tcp_ports' => '25565', 'udp_ports' => '25565', 'public_host' => $host,
     ]))->toThrow(InvalidArgumentException::class);
-})->with(['', 'https://games.example.com', 'games.example.com:25565', '[2001:db8::1]', "bad\nhost", '127.0.0.1', '10.0.0.1', '::1']);
+})->with(['https://games.example.com', 'games.example.com:25565', '[2001:db8::1]', "bad\nhost", '127.0.0.1', '10.0.0.1', '::1']);

@@ -33,7 +33,7 @@ it('replaces an obsolete allocation on the exact port and removes the old remote
     $publication = ServerPublication::create(['server_id' => 12, 'server_uuid' => '3a3c5ce9-8a95-4a44-ac80-78a5ea811886', 'opted_in' => true]);
     $api = new PangolinApiFake;
     $api->install();
-    $reconciler = new PublicationReconciler(new HttpPangolinClient('https://api.example.com', 'test-org', 'fixture-only'), PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler(new HttpPangolinClient('https://api.example.com', 'test-org', 'fixture-only'), new PublicPortAllocator, new ResourceNaming);
     $resources = fn (int $id): array => array_map(fn (PublicationMode $mode) => new DesiredResource($id, 25565, $mode, null), $modes);
     $reconciler->reconcile($publication, new DesiredPublication(1, 7, 'old-node.internal', $resources(1)));
     expect($publication->fresh()->status)->toBe(SyncStatus::Synced)

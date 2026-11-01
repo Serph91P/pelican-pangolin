@@ -42,12 +42,12 @@ final class ManagePangolinPublicationAction extends Action
                 $publication = ServerPublication::query()->where('server_id', $record->id)->first();
                 $overrides = $publication === null ? [] : ($publication->desired_state['overrides'] ?? []);
                 $formattedOverrides = [];
-                if (is_array($overrides)) {
-                    foreach ($overrides as $allocationId => $override) {
-                        if (is_array($override)) {
-                            $formattedOverrides[] = ['allocation_id' => (int) $allocationId, ...$override];
-                        }
-                    }
+                if (isset($publication->desired_state['node_id']) && $publication->desired_state['node_id'] !== $record->node_id) {
+                    $overrides = [];
+                }
+                foreach ($record->allocations->sortBy('id') as $allocation) {
+                    $override = $overrides[$allocation->id] ?? ['mode' => 'ignored', 'purpose' => 'ignored'];
+                    $formattedOverrides[] = ['allocation_id' => $allocation->id, ...$override];
                 }
 
                 return [
@@ -57,10 +57,11 @@ final class ManagePangolinPublicationAction extends Action
             })
             ->schema([
                 Toggle::make('opted_in')->label('Publish this server through Pangolin')->live(),
-                Placeholder::make('raw_warning')->content('TCP and UDP publications bypass Pangolin authentication and require prepared firewall, Docker, and Traefik port mappings.'),
+                Placeholder::make('raw_warning')->content('Approve Game/Query and TCP/UDP/Both for each actual allocation. New allocations are unpublished. Legacy fixed-port Egg profiles are retired: reapprove here; previous profile-only resources are cleaned up on reconciliation. TCP/UDP bypass Pangolin authentication. API synchronization does not apply infrastructure or prove reachability.'),
+                Placeholder::make('allocation_inventory')->content(fn (Server $record): string => $record->allocations->sortBy('id')->map(fn ($allocation): string => "ID {$allocation->id} — bind {$allocation->ip} — port {$allocation->port}")->implode('; ')),
                 Repeater::make('overrides')->schema([
                     Select::make('allocation_id')
-                        ->options(fn (Server $record) => $record->allocations->mapWithKeys(fn ($allocation): array => [$allocation->id => $allocation->address]))
+                        ->options(fn (Server $record) => $record->allocations->mapWithKeys(fn ($allocation): array => [$allocation->id => "ID {$allocation->id} — {$allocation->ip}:{$allocation->port}"]))
                         ->distinct()->required(),
                     Select::make('mode')->options(collect(PublicationMode::cases())->mapWithKeys(fn (PublicationMode $mode): array => [$mode->value => ucfirst($mode->value)]))->required()->live(),
                     Select::make('purpose')->options(['game' => 'Game', 'query' => 'Query', 'ignored' => 'Do not publish'])->required(),
@@ -113,10 +114,8 @@ final class ManagePangolinPublicationAction extends Action
                         'opted_in' => true,
                         'suspended' => false,
                         'deletion_pending' => false,
-                        'status' => SyncStatus::Pending,
-                        'desired_state' => ['overrides' => $overrides],
                     ])->save();
-                    app(PublicationStateSnapshot::class)->refresh($record->loadMissing(['egg', 'allocations']), $publication);
+                    app(PublicationStateSnapshot::class)->refresh($record->loadMissing(['egg', 'allocations']), $publication, $overrides);
                     ReconcileServerPublication::dispatch($publication->id, $record->id, $publication->desired_revision);
                 });
 

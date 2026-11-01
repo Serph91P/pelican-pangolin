@@ -4,7 +4,7 @@ use PelicanDev\PelicanPangolin\Filament\Admin\Pages\Infrastructure;
 use PelicanDev\PelicanPangolin\Services\InfrastructureSnippetGenerator;
 
 it('renders exact copyable text with accessible labels and escapes hostile markup', function () {
-    $blocks = (new InfrastructureSnippetGenerator)->generate('30000', '30000');
+    $blocks = (new InfrastructureSnippetGenerator)->generate([['protocol' => 'tcp', 'port' => 30000], ['protocol' => 'udp', 'port' => 30000]]);
     $blocks['firewall'] = '<script>alert(1)</script>';
     $html = view('pelican-pangolin::infrastructure-blocks', ['snippets' => $blocks])->render();
     $document = new DOMDocument;

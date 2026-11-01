@@ -45,7 +45,7 @@ it('serializes snapshots from stale models and does not revive an opted-out publ
     $snapshot = app(PublicationStateSnapshot::class);
     $snapshot->refresh($server, $publication);
     $snapshot->refresh($server, $stale);
-    expect($publication->fresh()->desired_revision)->toBe(3);
+    expect($publication->fresh()->desired_revision)->toBe(2);
     ServerPublication::whereKey($publication->id)->update(['opted_in' => false, 'desired_revision' => 4, 'status' => 'removing']);
     $snapshot->refresh($server, $stale);
     expect($publication->fresh()->desired_revision)->toBe(4)->and($publication->fresh()->status->value)->toBe('removing');

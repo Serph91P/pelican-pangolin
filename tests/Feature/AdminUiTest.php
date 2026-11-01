@@ -14,7 +14,8 @@ it('exposes administrator resources and a server publication action', function (
         ->and(ServerPublicationResource::class)->toExtend(Resource::class)
         ->and(ManagePangolinPublicationAction::make())->toBeInstanceOf(Action::class)
         ->and(array_keys(NodeMappingResource::getPages()))->toContain('index', 'create', 'edit')
-        ->and(array_keys(EggProfileResource::getPages()))->toContain('index', 'create', 'edit')
+        ->and(array_keys(EggProfileResource::getPages()))->toBe(['index'])
+        ->and(EggProfileResource::canCreate())->toBeFalse()
         ->and(array_keys(ServerPublicationResource::getPages()))->toBe(['index']);
 });
 

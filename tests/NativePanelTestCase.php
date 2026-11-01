@@ -57,8 +57,7 @@ abstract class NativePanelTestCase extends TestCase
             'session.driver' => 'array',
             'queue.default' => 'database',
             'pelican-pangolin.public_host' => 'games.example.com',
-            'pelican-pangolin.tcp_ports' => '25565-25566',
-            'pelican-pangolin.udp_ports' => '25565-25566',
+
         ]);
 
         return $app;

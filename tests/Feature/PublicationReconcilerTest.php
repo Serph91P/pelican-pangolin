@@ -44,7 +44,7 @@ it('recovers idempotently when target creation fails after resource creation', f
     });
     $reconciler = new PublicationReconciler(
         $client,
-        PublicPortAllocator::from('25565,30000-30001', '25565'),
+        new PublicPortAllocator,
         new ResourceNaming,
     );
 
@@ -81,7 +81,7 @@ it('disables and removes only exact locally owned remote identifiers', function 
         $mock->shouldReceive('deleteResource')->once()->with(101);
         $mock->shouldReceive('listTargets')->once()->with(101)->andReturn([]);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('27015', '27015'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->disable($publication);
     expect($publication->fresh()->status)->toBe(SyncStatus::Disabled);
@@ -122,7 +122,7 @@ it('repairs a missing owned target without adopting an unowned target', function
             ->andReturn(['targetId' => 203]);
         $mock->shouldReceive('updateResource')->once()->andReturn(['resourceId' => 201]);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->reconcile($publication, $desired);
 
@@ -155,7 +155,7 @@ it('publishes HTTP only with an explicit verified domain and stores Pangolins co
         $mock->shouldReceive('listTargets')->once()->with(301)->andReturn([]);
         $mock->shouldReceive('updateResource')->once()->with(301, Mockery::type('array'))->andReturn(['resourceId' => 301, 'fullDomain' => 'play.example.com']);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->reconcile($publication, $desired);
 
@@ -197,7 +197,7 @@ it('updates the domain of an existing HTTP resource', function () {
             'subdomain' => 'new',
         ])->andReturn(['resourceId' => 401, 'fullDomain' => 'new.example.net']);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->reconcile($publication, $desired);
 
@@ -233,7 +233,7 @@ it('reuses one ownership row when switching an allocation between HTTP methods',
         ]);
         $mock->shouldReceive('updateResource')->once()->andReturn(['resourceId' => 701, 'fullDomain' => 'play.example.com']);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->reconcile($publication, $desired);
 
@@ -269,7 +269,7 @@ it('adopts one exact deterministic resource and target after an ambiguous create
             'proxyPort' => 25565,
         ])->andReturn(['resourceId' => 501]);
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
     $reconciler->reconcile($publication, $desired);
 
@@ -295,9 +295,9 @@ it('fails clearly without remapping when Pangolin already uses the allocation po
         $mock->shouldReceive('createRawResource')->never();
         $mock->shouldReceive('createTarget')->never();
     });
-    $reconciler = new PublicationReconciler($client, PublicPortAllocator::from('25565-25566', '25565'), new ResourceNaming);
+    $reconciler = new PublicationReconciler($client, new PublicPortAllocator, new ResourceNaming);
 
-    expect(fn () => $reconciler->reconcile($publication, $desired))->toThrow(RuntimeException::class, 'exact allocation port');
+    expect(fn () => $reconciler->reconcile($publication, $desired))->toThrow(RuntimeException::class, 'exact public allocation port');
     expect($publication->resources()->count())->toBe(0)
         ->and($publication->fresh()->status)->toBe(SyncStatus::Error);
 });

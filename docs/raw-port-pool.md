@@ -1,14 +1,24 @@
-# Raw port pools and infrastructure handoff
+# Allocation publication and infrastructure handoff
 
-Raw TCP and UDP are public and unauthenticated. Pangolin authentication does not protect RCON, databases, management, Wings or SFTP. Do not approve these allocations. Only explicitly approved `game`/`query` purposes from admin overrides or exact-port Egg rules are eligible; a port number alone never implies a protocol or purpose.
+The historical filename is retained for existing links. **There are no plugin port pools.** Old `PANGOLIN_TCP_PORTS` / `PANGOLIN_UDP_PORTS` values are inert, not hidden allowlists.
 
-## Configure once
+Raw TCP and UDP are public and unauthenticated. Pangolin authentication does not protect RCON, databases, management, Wings or SFTP. Do not approve these allocations. Only explicitly approved `game` / `query` purposes per current allocation ID are eligible; neither an Egg rule nor a port number implies approval, protocol or purpose.
 
-Set an explicit player-facing IPv4, IPv6 (without brackets), or domain in plugin settings (`PANGOLIN_PUBLIC_HOST`). This is not inferred from the API endpoint or DNS. Raw public and internal ports must match. A conflicting/out-of-pool allocation fails, even if another port is free. TCP and UDP pools/reservations are independent, so the same number can be approved for both.
+## Approve actual allocations
 
-Pools accept comma-separated ports and inclusive ranges, e.g. `25565,30000-30100`. Each protocol allows at most 1024 ports, between 1024 and 65535. Duplicate/overlapping ranges and reserved ports 2022, 8080, 8443, 51820, 51821 are rejected. Operators must also check deployment-specific listeners/reservations: the plugin cannot inventory the host. Do not include HTTP/TLS/SSH/management listeners.
+Set an explicit player-facing IPv4, IPv6 (without brackets), or domain in plugin settings (`PANGOLIN_PUBLIC_HOST`). This is not inferred from the API endpoint or public API DNS. HTTP-only setups do not need it. Raw public and internal ports must match. Conflicts fail even if another port is free. TCP and UDP reservations are independent, so the same allocation can be approved for both.
 
-Open **Pangolin infrastructure** in the admin navigation (root admin only), or run `php artisan pangolin:infrastructure`. Copy buttons copy the complete readonly text; if clipboard permission is unavailable, select/copy manually. Nothing is applied remotely.
+Select a Pangolin site in each node mapping. Its numeric site ID and nice ID are saved together. Each concrete allocation bind IP is the actual target reached through that site, not the public game host. Wildcard binds (`0.0.0.0`, `::`) use the mapping's explicit site-reachable target. Ensure the site can reach those private addresses; the plugin does not probe or infer network reachability. Two concrete IPs with the same port/protocol still compete for one listener on the public host: select only one. No native bind/port, Node/Wings data or manual alias is rewritten.
+
+Open an existing server's Pangolin publication action. Its full current allocation list shows ID, bind IP, port and effective selection. Enable publication, select Game or Query and TCP, UDP or Both for each approved ID. New and unselected allocations remain unpublished. HTTP/HTTPS is an explicit advanced selection with its own domain; raw use requires no domain inventory. Same-ID IP/port updates follow the current allocation. Replacement IDs and node transfers do not inherit a matching number's approval. Manual aliases stay untouched; see confirmed endpoint when an alias intentionally differs.
+
+Ports must be 1024–65535. Known protected ports 2022, 8080, 8443, 51820 and 51821 are rejected. Operators must also check deployment-specific listeners/reservations: the plugin cannot inventory the host. Never approve management listeners just because their number passes validation.
+
+## Derive requirements, do not invent inventory
+
+Open **Pangolin infrastructure** in the admin navigation (root admin only), or run `php artisan pangolin:infrastructure`. The source is currently assigned, explicitly approved allocation/protocol pairs, deduplicated and sorted. Empty selection gives a no-demand explanation, not a pool error. Stored remote raw resources are listed separately as retained rows and remain included in requirements while cleanup is uncertain, even after opt-out or server deletion. A desired-state change alone is not evidence that an old listener is safe to remove.
+
+Copy buttons copy the complete readonly text; if clipboard permission is unavailable, select/copy manually. Nothing is applied remotely.
 
 ## Merge, never replace
 
@@ -19,7 +29,7 @@ The generated YAML includes parent keys to show structure. Do NOT paste duplicat
 3. Pangolin `config/config.yml`: set `allow_raw_resources: true` under existing `flags`; do not duplicate `flags`.
 4. Host AND provider firewall: permit only the approved TCP/UDP numbers using the actual firewall tooling/policy. No UFW assumption or executable firewall command is generated.
 
-Example shape for TCP and UDP port 25565 (merge the children, not duplicate parent keys):
+Example shape for one approved allocation using TCP and UDP port 25565 (merge the children, not duplicate parent keys):
 
 ```yaml
 entryPoints:
@@ -42,12 +52,12 @@ flags:
   allow_raw_resources: true
 ```
 
-Commit reviewed infrastructure changes to the responsible Git repository and hand off to Dockhand/Infra. Static Traefik changes require a Traefik restart. Docker port-mapping changes require recreation of the affected Gerbil container. Restarting only the Pangolin app is insufficient. No stack shutdown is recommended. Once the bounded pool is prepared, publishing a new server within it needs only API reconciliation, not a per-server infrastructure restart.
+Commit reviewed infrastructure changes to the responsible Git repository and hand off to Dockhand/Infra. Static Traefik changes require a Traefik restart. Docker port-mapping changes require recreation of the affected Gerbil container. Restarting only the Pangolin app is insufficient. No stack shutdown is recommended. Every newly required arbitrary external listener still needs actual infrastructure application; the Integration API cannot apply these static changes.
 
-## Acceptance and rollback
+## Acceptance, cleanup and rollback
 
-The UI distinguishes generated output from applied infrastructure (unknown) and external reachability (not tested). `synced` means API resources/targets were synchronized, not that a game connection works. Infra must verify host/provider firewall, listeners, container mappings and real external TCP AND UDP traffic against an actual test game/query listener. A UDP send without a response is not success evidence.
+Generated requirements, applied infrastructure (unknown) and external reachability (not tested) are separate. `synced` means API resources/targets were synchronized, not that a game connection works. Infra must verify host/provider firewall, listeners, container mappings and real external TCP AND UDP traffic against an actual test game/query listener. A UDP send without a response is not success evidence.
 
-Before withdrawing a pool port, opt out its publications and verify remote deletion where possible. On reconciliation, ports outside the current approved pool cause existing owned publication resources to be disabled before the pool error is reported. Ownership records remain for retry/recovery; restoring the pool can resynchronize the same identities. This is eventual reconciliation, not immediate revocation at settings save. An `error` status, missing alias or changed generated snippet alone is not proof that exposure ended: API/connectivity/ownership failures can prevent disable/cleanup. Retain ownership records and resolve these failures; verify remote state before claiming successful revocation.
+Withdraw approvals or opt out, process the queue and verify remote deletion. Pending/failed cleanup remains visible, including root-only tombstones for deleted Pelican servers; correct the failure and retry. Partial API failures retain ownership IDs. An `error`/`blocked` status, missing alias or changed snippet is not proof that exposure ended: API/connectivity/ownership failures can prevent disable/cleanup. Keep ownership records and infrastructure for retained remote rows until confirmed cleanup.
 
-For rollback, opt out affected servers and wait for owned resources to be removed first. Review the infrastructure Git diff, remove only this approved pool's no-longer-used entries, and hand off restart/recreation to Infra/Dockhand. Preserve existing ports/services. No production mutation, restart or deployment is part of plugin delivery.
+For rollback, finish remote cleanup first. Review the infrastructure Git diff, remove only no-longer-used plugin entries, and hand off restart/recreation to Infra/Dockhand. Preserve existing ports/services. See [installation](installation.md) for matching file/database rollback and legacy-profile reapproval. No production mutation, restart or deployment is part of plugin delivery.

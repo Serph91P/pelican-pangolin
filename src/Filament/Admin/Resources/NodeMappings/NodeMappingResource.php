@@ -15,6 +15,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use PelicanDev\PelicanPangolin\Contracts\PangolinClient;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\NodeMappings\Pages\CreateNodeMapping;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\NodeMappings\Pages\EditNodeMapping;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\NodeMappings\Pages\ListNodeMappings;
@@ -42,9 +43,8 @@ final class NodeMappingResource extends Resource
                 ->label('Pelican node')
                 ->options(fn () => user()?->accessibleNodes()->pluck('name', 'id') ?? collect())
                 ->searchable()->required()->unique(ignoreRecord: true),
-            TextInput::make('site_id')->label('Pangolin site ID')->numeric()->minValue(1)->required(),
-            TextInput::make('site_nice_id')->label('Stable Pangolin site identifier')->required()->maxLength(255),
-            TextInput::make('target_host')->helperText('Host reachable from the selected Pangolin site.')->required()->maxLength(255),
+            Select::make('site_id')->label('Pangolin site')->options(fn (): array => collect(app(PangolinClient::class)->listSites())->mapWithKeys(fn (array $site): array => [$site['siteId'] => ($site['niceId'] ?? '').' ('.$site['siteId'].')'])->all())->required()->helperText('Read from this organisation. The numeric ID and stable identifier are stored together; no write or reachability check.'),
+            TextInput::make('target_host')->label('Site-reachable wildcard target')->helperText('Explicit reachable host/IP for 0.0.0.0 or :: allocations. Concrete allocation bind IPs are used unchanged. Never use the public API hostname as a guessed target.')->required()->maxLength(255),
             Toggle::make('enabled')->default(true),
         ]);
     }
