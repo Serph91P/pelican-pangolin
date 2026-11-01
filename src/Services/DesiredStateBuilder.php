@@ -57,7 +57,7 @@ final class DesiredStateBuilder
             }
 
             $bindIp = (string) ($allocation['ip'] ?? '');
-            $targetHost = in_array($bindIp, ['0.0.0.0', '::'], true) ? (string) ($mapping['target_host'] ?? '') : $bindIp;
+            $targetHost = NodeMappingValidator::isWildcard($bindIp) ? (string) ($mapping['target_host'] ?? '') : $bindIp;
             if (! NodeMappingValidator::validTarget($targetHost)) {
                 throw new DomainException('A concrete allocation bind IP or explicit site-reachable wildcard target is required.');
             }

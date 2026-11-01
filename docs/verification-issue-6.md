@@ -12,8 +12,8 @@ Source/PR repository: `Serph91P/pelican-pangolin`, base `develop` at `f9a089c8d2
 | Allocation regression tests before implementation | RED: legacy pool validation, implicit Egg approval, missing bind/target identity and onboarding help; not merely a new green suite |
 | Additional focused RED → GREEN | Duplicate concrete-IP public listener rejected before mutation; missing settings/failed-read notification; immediate cleanup DI failure reporting; visible native suspension column |
 | `bash scripts/build-plugin.sh` | PASS: ZIP contains source files only, no vendor payload; every archived file byte compared to its source |
-| `composer test -- --compact` | PASS: 146 tests, 1119 assertions |
-| `vendor/bin/pest tests/Integration --compact` | PASS: 14 tests, 249 assertions; overlapping subset of the full suite |
+| `composer test -- --compact` | PASS after B1 correction: 156 tests, 1273 assertions (pre-correction baseline: 146/1119) |
+| `vendor/bin/pest tests/Integration --compact` | PASS after B1 correction: 21 tests, 397 assertions; overlapping subset of the full suite |
 | `composer validate --strict` | PASS |
 | `composer lint` | PASS |
 | `composer analyse` | PASS: 48 source files |
@@ -34,6 +34,14 @@ The real server action renders every current allocation ID, bind IP and port. An
 The same flow withdraws approval, simulates missing native server state, injects a deletion failure, confirms retained remote ownership/error/tombstone visibility, and retries through the native publications table. The final API fixture is empty, cleanup is no longer pending and the command reports no approved raw demand/retained rows.
 
 Adjacent native cases cover no-selection vs configuration-blocked vs actual suspension, blank initial token and HTTP 401/403/503 read errors without saving credentials, legacy per-ID preservation and profile-only remote cleanup, primary-ID replacement, node transfer, root-only orphan visibility, TCP-only/UDP-only/HTTP-only use, concrete IPv6 targets, manual aliases and bracketed public IPv6 endpoints. Unit/feature coverage retains ownership checks, unexpected-target refusal, stale revisions, independent TCP/UDP conflicts, protected ports, shared locks, partial API failure/retry and byte-exact copy/YAML contracts. Queue draining uses bounded `queue:work --once` invocations: a long-running `--stop-when-empty` Worker retains daemon exit state when reused inside one PHP test process.
+
+## Review correction B1: semantic wildcard identity
+
+Independent review reproduced expanded/compressed unspecified IPv6 binds being sent as targets and a native mapping Create form accepting `0:0::` as validated. Literal comparisons were insufficient. The correction uses PHP's standard `inet_pton` representation to identify all-zero IPv4/IPv6 addresses in one shared predicate. The builder resolves these binds through the explicit node mapping; all mapping validation paths reject them. No address normalization is written back to native allocations. No network probe, discovery mechanism, migration or dependency was added.
+
+Before repair, `vendor/bin/pest tests/Unit/AllocationFlowTest.php tests/Integration/AllocationFlowTest.php --compact --colors=never` returned **9 failed / 22 passed, 289 assertions** on the preceding product code: three builder target mismatches, three Create forms missing rejection, three real queued target mismatches. An earlier fixture setup failure (missing test API configuration) was corrected before recording this RED evidence. After repair the same command passed **31 tests / 370 assertions**. Cases include `::`, `0:0::`, `0:0:0:0:0:0:0:0` and `::0.0.0.0`, plus concrete IPv4/IPv6 and hostname controls. Native Create/Edit rejection reads durable state to confirm that no invalid mapping was inserted or saved; explicit revalidation clears an existing invalid mapping's validation status. Native allocation update -> database queue -> HTTP fixture checks actual target IPs, the unchanged original bind string/port, snapshot and public alias.
+
+Self-review read the complete correction diff and its shared Create/Edit/Validate/builder callers. Tests extend the existing table and use native boundaries, with no test-only production seam, skipped assertions or CI relaxation. The automated gstack gate inventory is unavailable (`env: bun: No such file or directory`); its gate-integrity questions were checked manually. The API remains a fixture, not a live Pangolin/reachability proof. The unchanged dev-only advisory and operational limitations below still apply.
 
 ## Review and limits
 

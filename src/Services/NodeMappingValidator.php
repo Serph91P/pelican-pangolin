@@ -15,9 +15,16 @@ final class NodeMappingValidator
 
     public function __construct(private readonly PangolinClient $client) {}
 
+    public static function isWildcard(string $host): bool
+    {
+        return filter_var($host, FILTER_VALIDATE_IP) !== false
+            && in_array(inet_pton($host), [str_repeat("\0", 4), str_repeat("\0", 16)], true);
+    }
+
     public static function validTarget(string $host): bool
     {
-        return ! in_array($host, ['', '0.0.0.0', '::', '127.0.0.1', '::1'], true)
+        return ! self::isWildcard($host)
+            && ! in_array($host, ['', '127.0.0.1', '::1'], true)
             && (filter_var($host, FILTER_VALIDATE_IP) !== false
                 || (strlen($host) <= 253 && (bool) preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/iD', $host)));
     }

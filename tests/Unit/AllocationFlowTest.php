@@ -24,7 +24,7 @@ it('requires per-ID approval even when a legacy Egg port matches', function () {
 it('uses concrete bind IPs and only explicit mapping for wildcard addresses', function (string $ip, string $target) {
     $state = (new DesiredStateBuilder)->build(1, ['desired_revision' => 1], ['enabled' => true, 'site_id' => 7, 'target_host' => 'node.internal'], [['id' => 1, 'ip' => $ip, 'port' => 30000]], [], [1 => ['purpose' => 'query', 'mode' => 'udp']], null);
     expect($state->resources[0]->targetHost)->toBe($target)->and($state->resources[0]->bindIp)->toBe($ip);
-})->with([['10.0.0.2', '10.0.0.2'], ['2001:db8::2', '2001:db8::2'], ['0.0.0.0', 'node.internal'], ['::', 'node.internal']]);
+})->with([['10.0.0.2', '10.0.0.2'], ['2001:db8::2', '2001:db8::2'], ['0.0.0.0', 'node.internal'], ['::', 'node.internal'], ['0:0::', 'node.internal'], ['0:0:0:0:0:0:0:0', 'node.internal'], ['::0.0.0.0', 'node.internal']]);
 
 it('blocks wildcard targets without a reachable mapping', function () {
     (new DesiredStateBuilder)->build(1, ['desired_revision' => 1], ['enabled' => true, 'site_id' => 7, 'target_host' => ''], [['id' => 1, 'ip' => '::', 'port' => 30000]], [], [1 => ['purpose' => 'game', 'mode' => 'tcp']], null);

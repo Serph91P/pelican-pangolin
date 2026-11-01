@@ -20,10 +20,12 @@ use PelicanDev\PelicanPangolin\Data\DesiredResource;
 use PelicanDev\PelicanPangolin\Enums\PublicationMode;
 use PelicanDev\PelicanPangolin\Filament\Admin\Pages\Infrastructure;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\NodeMappings\Pages\CreateNodeMapping;
+use PelicanDev\PelicanPangolin\Filament\Admin\Resources\NodeMappings\Pages\EditNodeMapping;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\ServerPublications\Pages\ListServerPublications;
 use PelicanDev\PelicanPangolin\Filament\Admin\Resources\ServerPublications\ServerPublicationResource;
 use PelicanDev\PelicanPangolin\Models\NodeMapping;
 use PelicanDev\PelicanPangolin\Models\ServerPublication;
+use PelicanDev\PelicanPangolin\Services\NodeMappingValidator;
 use PelicanDev\PelicanPangolin\Services\PublicationReconciler;
 use PelicanDev\PelicanPangolin\Services\PublicationRefreshService;
 use PelicanDev\PelicanPangolin\Tests\NativePanelTestCase;
@@ -203,3 +205,39 @@ it('synchronizes single-protocol setups without unrelated pool or HTTP prerequis
         Http::assertNotSent(fn ($request) => str_contains($request->url(), '/domains'));
     }
 })->with(['tcp', 'udp', 'http']);
+
+it('rejects every IPv6 wildcard spelling through native mapping create save and validation', function (string $wildcard) {
+    config()->set(['pelican-pangolin.api_url' => 'https://api.example.com', 'pelican-pangolin.organization_id' => 'test-org', 'pelican-pangolin.token' => 'fixture-only']);
+    $node = Node::factory()->create();
+    Livewire::test(CreateNodeMapping::class)->fillForm(['node_id' => $node->id, 'site_id' => 7, 'target_host' => $wildcard, 'enabled' => true])->call('create')->assertHasFormErrors(['site_id']);
+    expect(NodeMapping::where('node_id', $node->id)->exists())->toBeFalse();
+
+    Livewire::test(CreateNodeMapping::class)->fillForm(['node_id' => $node->id, 'site_id' => 7, 'target_host' => '10.0.0.42', 'enabled' => true])->call('create')->assertHasNoFormErrors();
+    $mapping = NodeMapping::where('node_id', $node->id)->firstOrFail();
+    expect($mapping->validated_at)->not->toBeNull();
+    Livewire::test(EditNodeMapping::class, ['record' => $mapping->id])->fillForm(['target_host' => $wildcard])->call('save')->assertHasFormErrors(['site_id']);
+    expect($mapping->fresh()->target_host)->toBe('10.0.0.42')->and($mapping->fresh()->validated_at)->not->toBeNull();
+    Livewire::test(EditNodeMapping::class, ['record' => $mapping->id])->fillForm(['target_host' => '2001:db8::42'])->call('save')->assertHasNoFormErrors();
+    expect($mapping->fresh()->target_host)->toBe('2001:db8::42')->and($mapping->fresh()->validated_at)->not->toBeNull();
+
+    // Existing invalid mappings must also lose read-validation status on retry.
+    $mapping->forceFill(['target_host' => $wildcard])->save();
+    expect(app(NodeMappingValidator::class)->validate($mapping))->toBeFalse()
+        ->and($mapping->fresh()->validated_at)->toBeNull()->and($mapping->fresh()->validation_error)->toContain('not a wildcard');
+})->with(['::', '0:0::', '0:0:0:0:0:0:0:0', '::0.0.0.0']);
+
+it('resolves native wildcard bind updates through the explicit mapping without changing bind data', function (string $wildcard) {
+    config()->set(['pelican-pangolin.api_url' => 'https://api.example.com', 'pelican-pangolin.organization_id' => 'test-org', 'pelican-pangolin.token' => 'fixture-only']);
+    $server = Server::factory()->create();
+    $allocation = $server->allocation;
+    $allocation->forceFill(['server_id' => $server->id, 'node_id' => $server->node_id, 'ip' => '::', 'port' => 30000, 'ip_alias' => null])->save();
+    Livewire::test(CreateNodeMapping::class)->fillForm(['node_id' => $server->node_id, 'site_id' => 7, 'target_host' => '2001:db8::42', 'enabled' => true])->call('create')->assertHasNoFormErrors();
+    Livewire::test(EditServer::class, ['record' => $server->id])->callAction('manage_pangolin_publication', data: ['opted_in' => true, 'overrides' => [['allocation_id' => $allocation->id, 'purpose' => 'game', 'mode' => 'both']]])->assertHasNoActionErrors();
+    drainAllocationQueue();
+    $allocation->update(['ip' => $wildcard]);
+    drainAllocationQueue();
+    $publication = ServerPublication::where('server_id', $server->id)->firstOrFail();
+    expect($publication->status->value)->toBe('synced')->and(array_column($this->api->targets, 'ip'))->toBe(['2001:db8::42', '2001:db8::42'])
+        ->and($publication->desired_state['allocations'][0]['ip'])->toBe($wildcard)
+        ->and($allocation->fresh()->ip)->toBe($wildcard)->and($allocation->fresh()->port)->toBe(30000)->and($allocation->fresh()->address)->toBe('games.example.com:30000');
+})->with(['0:0::', '0:0:0:0:0:0:0:0', '::0.0.0.0']);
